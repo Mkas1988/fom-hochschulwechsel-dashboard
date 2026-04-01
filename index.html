@@ -264,51 +264,6 @@
         .badge-display { background: #e2e3e5; color: #383d41; }
         .badge-referral { background: #cce5ff; color: #004085; }
 
-        /* Recommendations */
-        .rec-list {
-            list-style: none;
-        }
-
-        .rec-list li {
-            background: var(--card);
-            border-radius: 10px;
-            padding: 16px 20px;
-            margin-bottom: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            display: flex;
-            gap: 14px;
-            align-items: flex-start;
-        }
-
-        .rec-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-
-        .rec-critical .rec-icon { background: #fce4ec; }
-        .rec-high .rec-icon { background: #fff3e0; }
-        .rec-medium .rec-icon { background: #e3f2fd; }
-
-        .rec-title { font-weight: 600; font-size: 0.9rem; }
-        .rec-desc { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
-        .rec-priority {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 700;
-            margin-top: 4px;
-        }
-
-        .rec-critical .rec-priority { color: var(--accent); }
-        .rec-high .rec-priority { color: var(--warning); }
-        .rec-medium .rec-priority { color: var(--primary-light); }
-
         .footer {
             text-align: center;
             padding: 32px 24px;
@@ -391,10 +346,10 @@
                     <div class="kpi-value">2,24</div>
                     <div class="kpi-sub">Gute Navigation</div>
                 </div>
-                <div class="kpi-card danger">
-                    <div class="kpi-label">Conversions</div>
-                    <div class="kpi-value">0</div>
-                    <div class="kpi-sub">Keine Ziele definiert!</div>
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Conversions (in Session)</div>
+                    <div class="kpi-value">21</div>
+                    <div class="kpi-sub">2,1% Conversion Rate</div>
                 </div>
             </div>
         </div>
@@ -535,51 +490,123 @@
             </div>
         </div>
 
-        <!-- Recommendations -->
+        <!-- Conversion Funnel -->
         <div class="section">
-            <div class="section-title">Handlungsempfehlungen</div>
-            <ul class="rec-list">
-                <li class="rec-critical">
-                    <div class="rec-icon">!!</div>
-                    <div>
-                        <div class="rec-title">Conversion-Tracking einrichten</div>
-                        <div class="rec-desc">Aktuell sind 0 Conversions definiert. Ohne Ziele kann der ROI der Paid-Kampagnen (92% des Traffics) nicht gemessen werden. Empfohlen: CTA-Klicks, Formularabsendungen, Beratungstermin-Buchungen als Key Events anlegen.</div>
-                        <div class="rec-priority">Kritisch</div>
-                    </div>
-                </li>
-                <li class="rec-critical">
-                    <div class="rec-icon">!</div>
-                    <div>
-                        <div class="rec-title">SEO-Strategie entwickeln</div>
-                        <div class="rec-desc">Nur 1,6% organischer Traffic (20 Sessions in 90 Tagen). Content-Optimierung f&uuml;r Keywords wie "Hochschulwechsel", "Uni wechseln", "Hochschule wechseln FOM" kann langfristig bezahlten Traffic reduzieren.</div>
-                        <div class="rec-priority">Kritisch</div>
-                    </div>
-                </li>
-                <li class="rec-high">
-                    <div class="rec-icon">&#9650;</div>
-                    <div>
-                        <div class="rec-title">Bing Ads skalieren</div>
-                        <div class="rec-desc">Kleine Basis (34 Sessions), aber beste Engagement-Werte: 100% Engagement Rate, 90 Sek. Sitzungsdauer. Potenzial f&uuml;r qualitativ hochwertige Leads bei niedrigeren CPCs.</div>
-                        <div class="rec-priority">Hoch</div>
-                    </div>
-                </li>
-                <li class="rec-high">
-                    <div class="rec-icon">&#9650;</div>
-                    <div>
-                        <div class="rec-title">Mobile UX optimieren</div>
-                        <div class="rec-desc">65% mobiler Traffic, aber nur 42 Sek. Sitzungsdauer (vs. 117 Sek. Desktop). Mobile Nutzer brechen fr&uuml;her ab – CTA-Elemente mobil prominenter platzieren, Ladezeit pr&uuml;fen.</div>
-                        <div class="rec-priority">Hoch</div>
-                    </div>
-                </li>
-                <li class="rec-medium">
-                    <div class="rec-icon">i</div>
-                    <div>
-                        <div class="rec-title">Scroll-Tiefe analysieren</div>
-                        <div class="rec-desc">Nur 26,4% der Nutzer l&ouml;sen ein Scroll-Event aus. Wichtige Informationen und CTAs sollten above-the-fold platziert werden, um die Interaktionsrate zu erh&ouml;hen.</div>
-                        <div class="rec-priority">Mittel</div>
-                    </div>
-                </li>
-            </ul>
+            <div class="section-title">Conversion-Pfade aus Hochschulwechsel-Sessions</div>
+            <div class="chart-grid">
+                <div class="chart-card">
+                    <h3>Conversion-Funnel (Sessions mit Landing Page /hochschulwechsel)</h3>
+                    <canvas id="funnelChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Conversion-Seiten (wo Conversions stattfinden)</h3>
+                    <canvas id="conversionPagesChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Follow-Up Pages Table -->
+        <div class="section">
+            <div class="section-title">Top-Folgeseiten nach /hochschulwechsel</div>
+            <div class="chart-card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Folgeseite</th>
+                            <th class="num">Nutzer</th>
+                            <th class="num">Seitenaufrufe</th>
+                            <th class="num">Conversions</th>
+                            <th class="num">Conv. Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>/studiengangsfinder.html</td>
+                            <td class="num">50</td>
+                            <td class="num">213</td>
+                            <td class="num">0</td>
+                            <td class="num">–</td>
+                        </tr>
+                        <tr>
+                            <td>/ (Startseite)</td>
+                            <td class="num">35</td>
+                            <td class="num">78</td>
+                            <td class="num">1</td>
+                            <td class="num">2,9%</td>
+                        </tr>
+                        <tr>
+                            <td>/de/das-studium/studiengangsfinder.html</td>
+                            <td class="num">34</td>
+                            <td class="num">143</td>
+                            <td class="num">0</td>
+                            <td class="num">–</td>
+                        </tr>
+                        <tr>
+                            <td>/anrechnung/</td>
+                            <td class="num">33</td>
+                            <td class="num">38</td>
+                            <td class="num">0</td>
+                            <td class="num">–</td>
+                        </tr>
+                        <tr>
+                            <td>/bachelor.html</td>
+                            <td class="num">32</td>
+                            <td class="num">125</td>
+                            <td class="num">1</td>
+                            <td class="num">3,1%</td>
+                        </tr>
+                        <tr>
+                            <td>/anmeldung.html</td>
+                            <td class="num">19</td>
+                            <td class="num">40</td>
+                            <td class="num">0</td>
+                            <td class="num">–</td>
+                        </tr>
+                        <tr>
+                            <td>/info-material/</td>
+                            <td class="num">18</td>
+                            <td class="num">20</td>
+                            <td class="num">0</td>
+                            <td class="num">–</td>
+                        </tr>
+                        <tr style="background:#f0fff0">
+                            <td>/sofortcheck.html</td>
+                            <td class="num">15</td>
+                            <td class="num">32</td>
+                            <td class="num"><strong>2</strong></td>
+                            <td class="num"><strong>13,3%</strong></td>
+                        </tr>
+                        <tr>
+                            <td>/business-administration-ba.html</td>
+                            <td class="num">18</td>
+                            <td class="num">44</td>
+                            <td class="num">0</td>
+                            <td class="num">–</td>
+                        </tr>
+                        <tr style="background:#f0fff0">
+                            <td>/studienberatung.html</td>
+                            <td class="num">11</td>
+                            <td class="num">28</td>
+                            <td class="num"><strong>2</strong></td>
+                            <td class="num"><strong>18,2%</strong></td>
+                        </tr>
+                        <tr style="background:#f0fff0">
+                            <td>/thank-you-page-infomaterial.html</td>
+                            <td class="num">4</td>
+                            <td class="num">10</td>
+                            <td class="num"><strong>5</strong></td>
+                            <td class="num"><strong>125%</strong></td>
+                        </tr>
+                        <tr style="background:#f0fff0">
+                            <td>/thank-you-page-anrechnung</td>
+                            <td class="num">4</td>
+                            <td class="num">10</td>
+                            <td class="num"><strong>5</strong></td>
+                            <td class="num"><strong>125%</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
     </div>
@@ -639,6 +666,8 @@ function initCharts() {
     createDeviceDurationChart();
     createEventsChart();
     createCitiesChart();
+    createFunnelChart();
+    createConversionPagesChart();
 }
 
 function createTrendChart() {
@@ -861,6 +890,94 @@ function createCitiesChart() {
             scales: {
                 x: { stacked: true, grid: { display: false } },
                 y: { stacked: true, beginAtZero: true, grid: { color: '#f0f0f0' } }
+            }
+        }
+    });
+}
+
+function createFunnelChart() {
+    new Chart(document.getElementById('funnelChart'), {
+        type: 'bar',
+        data: {
+            labels: [
+                'Sessions gesamt',
+                'Studiengangsfinder besucht',
+                'Anrechnung besucht',
+                'Anmeldung besucht',
+                'Infomaterial angefragt',
+                'Sofortcheck gemacht',
+                'Studienberatung kontaktiert',
+                'Conversions (gesamt)'
+            ],
+            datasets: [{
+                label: 'Nutzer',
+                data: [1020, 84, 38, 19, 18, 15, 16, 21],
+                backgroundColor: [
+                    '#003366', '#004d99', '#3498db', '#1abc9c',
+                    '#2ecc71', '#f39c12', '#e67e22', '#e63946'
+                ],
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const pct = Math.round(ctx.raw / 1020 * 100 * 10) / 10;
+                            return ctx.raw + ' Nutzer (' + pct + '% der Sessions)';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+}
+
+function createConversionPagesChart() {
+    new Chart(document.getElementById('conversionPagesChart'), {
+        type: 'bar',
+        data: {
+            labels: [
+                'Thank-You Infomaterial',
+                'Thank-You Anrechnung',
+                'Sofortcheck',
+                'Studienberatung',
+                'Startseite',
+                'Bachelor-Übersicht',
+                'Soziale Arbeit BA',
+                'Studienberatung (de)',
+                'FAQ Studienberatung',
+                'Studienfinanzierung',
+                'Master IT-Mgmt'
+            ],
+            datasets: [{
+                label: 'Conversions',
+                data: [5, 5, 2, 2, 1, 1, 1, 1, 1, 1, 1],
+                backgroundColor: COLORS.accent,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            indexAxis: 'y',
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: { color: '#f0f0f0' },
+                    ticks: { stepSize: 1 }
+                },
+                y: { grid: { display: false } }
             }
         }
     });
