@@ -410,23 +410,36 @@ const Charts = (() => {
     function sankeyChart(id, followUpPages, currentPageLabel) {
         if (!followUpPages || followUpPages.length === 0) return;
 
-        const top = [...followUpPages].sort((a, b) => b.users - a.users).slice(0, 12);
         const fromLabel = currentPageLabel || 'Landing Page';
 
-        const data = top.map(p => ({
-            from: fromLabel,
-            to: shortenPath(p.page) || p.page,
-            flow: p.users
-        }));
+        // Filter out self-references and entries with 0 users, take top 12
+        const top = [...followUpPages]
+            .filter(p => p.users > 0 && shortenPath(p.page) !== fromLabel && p.page !== '/')
+            .sort((a, b) => b.users - a.users)
+            .slice(0, 12);
 
-        // Color coding: green for pages with conversions, primary for others
-        const convPages = new Set(top.filter(p => p.conversions > 0).map(p => shortenPath(p.page) || p.page));
+        if (top.length === 0) return;
 
+        // Ensure unique "to" labels (avoid duplicates)
+        const usedLabels = new Set();
+        const data = [];
         const labels = {};
         labels[fromLabel] = fromLabel;
+
         top.forEach(p => {
-            const short = shortenPath(p.page) || p.page;
-            labels[short] = short;
+            let toLabel = shortenPath(p.page) || p.page;
+            // Avoid duplicate labels
+            if (usedLabels.has(toLabel)) toLabel = toLabel + ' (' + p.page.split('/').slice(-2, -1)[0] + ')';
+            if (toLabel === fromLabel) toLabel = toLabel + ' (Seite)';
+            usedLabels.add(toLabel);
+            labels[toLabel] = toLabel;
+            data.push({ from: fromLabel, to: toLabel, flow: p.users });
+        });
+
+        // Color map for nodes with conversions
+        const convSet = new Set();
+        top.forEach((p, i) => {
+            if (p.conversions > 0) convSet.add(Array.from(usedLabels)[i]);
         });
 
         render(id, {
@@ -436,14 +449,11 @@ const Charts = (() => {
                     label: 'Nutzer-Pfade',
                     data: data,
                     colorFrom: COLORS.primary,
-                    colorTo: (ctx) => {
-                        const to = ctx.raw?.to || '';
-                        return convPages.has(to) ? COLORS.success : COLORS.secondary;
-                    },
+                    colorTo: COLORS.secondary,
                     colorMode: 'gradient',
                     labels: labels,
                     size: 'max',
-                    nodeWidth: 14,
+                    nodeWidth: 12,
                     borderWidth: 0
                 }]
             },
@@ -453,13 +463,9 @@ const Charts = (() => {
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: ctx => {
-                                const d = ctx.raw;
-                                if (!d) return '';
-                                const convInfo = top.find(p => (shortenPath(p.page) || p.page) === d.to);
-                                let label = d.from + ' → ' + d.to + ': ' + fmt(d.flow) + ' Nutzer';
-                                if (convInfo?.conversions > 0) label += ' (' + convInfo.conversions + ' Conv.)';
-                                return label;
+                            label: function(ctx) {
+                                if (!ctx.raw) return '';
+                                return ctx.raw.from + ' → ' + ctx.raw.to + ': ' + fmt(ctx.raw.flow) + ' Nutzer';
                             }
                         }
                     }
