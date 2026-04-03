@@ -230,6 +230,34 @@ const App = (() => {
             }));
     }
 
+    // ── Build traffic distribution data respecting date filter ──
+    function getTrafficDistPages() {
+        const isFullRange = state.dateStart === DATA.dateRange.start && state.dateEnd === DATA.dateRange.end;
+
+        // For pages with detailed daily data: calculate filtered sessions
+        const detailedPages = DATA.pages.map(dp => {
+            const daily = dp.daily ? dp.daily.filter(d => d.date >= state.dateStart && d.date <= state.dateEnd) : [];
+            const sessions = daily.reduce((sum, d) => sum + (d.sessions || 0), 0);
+            const indexEntry = INDEX.pages.find(ip => ip.path === dp.path);
+            return {
+                path: dp.path,
+                label: indexEntry?.label || dp.label || dp.path,
+                sessions: sessions,
+                category: indexEntry?.category || 'Sonstige'
+            };
+        });
+
+        if (isFullRange) {
+            // Full range: show all pages from INDEX, but use detailed sessions where available
+            const detailedPaths = new Set(detailedPages.map(p => p.path));
+            const otherPages = INDEX.pages.filter(p => !detailedPaths.has(p.path));
+            return [...detailedPages, ...otherPages].sort((a, b) => b.sessions - a.sessions);
+        } else {
+            // Filtered range: only show pages with daily data (accurate numbers)
+            return detailedPages.sort((a, b) => b.sessions - a.sessions);
+        }
+    }
+
     // ── Render ──
     function renderAll() {
         const detailed = getDetailedPage();
@@ -312,9 +340,10 @@ const App = (() => {
 
         switch (tab) {
             case 'overview':
-                // Always render traffic distribution from INDEX
-                Charts.trafficBars('traffic-bars', INDEX.pages, INDEX.categories, selectPage);
-                Charts.categoryDonut('chart-category-donut', INDEX.pages, INDEX.categories);
+                // Traffic distribution with date-filtered sessions
+                const distPages = getTrafficDistPages();
+                Charts.trafficBars('traffic-bars', distPages, INDEX.categories, selectPage);
+                Charts.categoryDonut('chart-category-donut', distPages, INDEX.categories);
                 if (page) Charts.trendLine('chart-trend', daily);
                 break;
             case 'traffic':
