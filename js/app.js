@@ -48,7 +48,7 @@ const App = (() => {
         DATA.pages.forEach((p, i) => {
             const opt = document.createElement('option');
             opt.value = i;
-            opt.textContent = p.label + '  (' + p.path + ')';
+            opt.textContent = p.label;
             sel.appendChild(opt);
         });
         sel.addEventListener('change', () => {
