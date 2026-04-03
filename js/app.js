@@ -1,18 +1,20 @@
 // ── FOM Web-Analyse App ──
 const App = (() => {
-    let DATA = null;
+    let DATA = null;       // detailed data (data.json)
+    let INDEX = null;      // all pages index (pages-index.json)
     let state = {
-        pageIdx: 0,
+        pagePath: '',
         dateStart: '',
         dateEnd: '',
         activeTab: 'overview'
     };
 
     // ── Init ──
-    function init(data) {
-        DATA = data;
-        state.dateStart = data.dateRange.start;
-        state.dateEnd = data.dateRange.end;
+    function init(detailedData, pageIndex) {
+        DATA = detailedData;
+        INDEX = pageIndex;
+        state.dateStart = DATA.dateRange.start;
+        state.dateEnd = DATA.dateRange.end;
 
         setupLogin();
         populateDropdown();
@@ -42,17 +44,49 @@ const App = (() => {
         input.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
     }
 
-    // ── Dropdown ──
+    // ── Dropdown with optgroups ──
     function populateDropdown() {
         const sel = document.getElementById('page-select');
-        DATA.pages.forEach((p, i) => {
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = p.label;
-            sel.appendChild(opt);
+        const categories = INDEX.categories;
+        const pages = INDEX.pages;
+
+        // Group pages by category
+        const groups = {};
+        categories.forEach(cat => groups[cat] = []);
+        pages.forEach(p => {
+            if (groups[p.category]) groups[p.category].push(p);
         });
+
+        // Build optgroups
+        categories.forEach(cat => {
+            const items = groups[cat];
+            if (!items || items.length === 0) return;
+
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = cat + ' (' + items.length + ')';
+
+            items.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.path;
+                const sessions = p.sessions >= 1000 ? Math.round(p.sessions / 1000) + 'k' : p.sessions;
+                opt.textContent = p.label + '  ·  ' + sessions + ' Sessions';
+                // Mark pages with detailed data
+                const hasDetail = DATA.pages.some(dp => dp.path === p.path);
+                if (!hasDetail) opt.style.color = '#999';
+                sel.appendChild(opt);
+            });
+
+            sel.appendChild(optgroup);
+        });
+
+        // Select first page
+        if (DATA.pages.length > 0) {
+            state.pagePath = DATA.pages[0].path;
+            sel.value = state.pagePath;
+        }
+
         sel.addEventListener('change', () => {
-            state.pageIdx = parseInt(sel.value);
+            state.pagePath = sel.value;
             renderAll();
         });
     }
@@ -125,9 +159,17 @@ const App = (() => {
         });
     }
 
-    // ── Data Filtering ──
+    // ── Get current page data ──
+    function getDetailedPage() {
+        return DATA.pages.find(p => p.path === state.pagePath);
+    }
+
+    function getIndexPage() {
+        return INDEX.pages.find(p => p.path === state.pagePath);
+    }
+
     function getFilteredDaily() {
-        const page = DATA.pages[state.pageIdx];
+        const page = getDetailedPage();
         if (!page || !page.daily) return [];
         return page.daily.filter(d => d.date >= state.dateStart && d.date <= state.dateEnd);
     }
@@ -148,10 +190,54 @@ const App = (() => {
         };
     }
 
-    // ── Render All ──
+    // ── Render ──
     function renderAll() {
-        renderKPIs();
-        renderTab(state.activeTab);
+        const detailed = getDetailedPage();
+        const indexPage = getIndexPage();
+        const noDataBanner = document.getElementById('no-data-banner');
+
+        if (!detailed && indexPage) {
+            // Show basic info from index
+            if (noDataBanner) {
+                noDataBanner.style.display = 'block';
+                noDataBanner.querySelector('.page-name').textContent = indexPage.label;
+                noDataBanner.querySelector('.page-sessions').textContent = fmtNum(indexPage.sessions);
+            }
+            setText('kpi-pv', '–');
+            setText('kpi-pv-sub', '');
+            setText('kpi-sessions', fmtNum(indexPage.sessions));
+            setText('kpi-sessions-sub', 'Gesamtzeitraum');
+            setText('kpi-users', '–');
+            setText('kpi-users-sub', '');
+            setText('kpi-engagement', '–');
+            setText('kpi-bounce', '–');
+            setText('kpi-duration', '–');
+            setText('kpi-pages', '–');
+            setText('kpi-conversions', '–');
+            setText('kpi-conversions-sub', '');
+            clearCharts();
+        } else {
+            if (noDataBanner) noDataBanner.style.display = 'none';
+            renderKPIs();
+            renderTab(state.activeTab);
+        }
+    }
+
+    function clearCharts() {
+        // Clear all chart canvases and tables
+        ['chart-trend','chart-traffic-trend','chart-sources-donut','chart-paid-organic',
+         'chart-device-donut','chart-device-duration','chart-cities','chart-events',
+         'chart-funnel','chart-conv-pages'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                const ctx = el.getContext('2d');
+                ctx.clearRect(0, 0, el.width, el.height);
+            }
+        });
+        ['table-sources','table-followup','flow-container'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '<div class="empty-state">Detaildaten für diese Seite nicht verfügbar. Nur Sessions-Gesamtzahl aus GA4 vorhanden.</div>';
+        });
     }
 
     function renderKPIs() {
@@ -174,7 +260,6 @@ const App = (() => {
         const convRate = agg.sessions > 0 ? (agg.conversions / agg.sessions * 100).toFixed(1).replace('.', ',') + '%' : '–';
         setText('kpi-conversions-sub', convRate + ' Conv. Rate');
 
-        // Set card classes
         const convCard = document.getElementById('kpi-conversions')?.closest('.kpi-card');
         if (convCard) {
             convCard.className = 'kpi-card ' + (agg.conversions > 0 ? 'highlight' : 'danger');
@@ -182,7 +267,7 @@ const App = (() => {
     }
 
     function renderTab(tab) {
-        const page = DATA.pages[state.pageIdx];
+        const page = getDetailedPage();
         if (!page) return;
         const daily = getFilteredDaily();
 
@@ -194,29 +279,29 @@ const App = (() => {
                 Charts.trendLine('chart-traffic-trend', daily);
                 break;
             case 'sources':
-                if (page.sources) {
+                if (page.sources?.length) {
                     Charts.sourcesDoughnut('chart-sources-donut', page.sources);
                     Charts.paidVsOrganic('chart-paid-organic', page.sources);
                     Tables.sourcesTable('table-sources', page.sources);
                 }
                 break;
             case 'devices':
-                if (page.devices) {
+                if (page.devices?.length) {
                     Charts.deviceDoughnut('chart-device-donut', page.devices);
                     Charts.deviceDuration('chart-device-duration', page.devices);
                 }
-                if (page.cities) Charts.citiesBar('chart-cities', page.cities);
-                if (page.events) Charts.eventsBar('chart-events', page.events);
+                if (page.cities?.length) Charts.citiesBar('chart-cities', page.cities);
+                if (page.events?.length) Charts.eventsBar('chart-events', page.events);
                 break;
             case 'conversions':
-                if (page.conversions?.funnel) Charts.funnelBar('chart-funnel', page.conversions.funnel);
-                if (page.conversions?.followUpPages) {
+                if (page.conversions?.funnel?.length) Charts.funnelBar('chart-funnel', page.conversions.funnel);
+                if (page.conversions?.followUpPages?.length) {
                     Charts.conversionPagesBar('chart-conv-pages', page.conversions.followUpPages);
                     Tables.followUpTable('table-followup', page.conversions.followUpPages);
                 }
                 break;
             case 'paths':
-                if (page.conversions?.followUpPages) {
+                if (page.conversions?.followUpPages?.length) {
                     Tables.flowTable('flow-container', page.conversions.followUpPages);
                 }
                 break;

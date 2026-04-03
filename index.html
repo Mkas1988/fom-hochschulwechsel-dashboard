@@ -67,6 +67,12 @@
 
     <div class="container">
 
+        <!-- No data banner -->
+        <div id="no-data-banner" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:10px;padding:16px 20px;margin-bottom:18px;font-size:0.88rem;">
+            <strong><span class="page-name"></span></strong> – <span class="page-sessions"></span> Sessions im Gesamtzeitraum.
+            Detaillierte Analyse (Trend, Quellen, Geräte, Conversions) ist nur für die Top-15-Seiten verfügbar.
+        </div>
+
         <!-- KPI Cards (always visible) -->
         <div class="kpi-grid">
             <div class="kpi-card">
@@ -223,14 +229,12 @@
 <script src="js/tables.js"></script>
 <script src="js/app.js"></script>
 <script>
-    // Data will be loaded here
-    fetch('data/data.json')
-        .then(r => r.json())
-        .then(data => App.init(data))
-        .catch(() => {
-            // Fallback: try inline data
-            if (typeof DASHBOARD_DATA !== 'undefined') App.init(DASHBOARD_DATA);
-        });
+    Promise.all([
+        fetch('data/data.json').then(r => r.json()),
+        fetch('data/pages-index.json').then(r => r.json())
+    ]).then(([data, index]) => {
+        App.init(data, index);
+    });
 </script>
 
 </body>
