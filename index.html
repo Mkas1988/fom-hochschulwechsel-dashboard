@@ -3,985 +3,234 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FOM Hochschulwechsel – Web-Analyse Dashboard</title>
+    <title>FOM Web-Analyse Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-    <style>
-        :root {
-            --primary: #003366;
-            --primary-light: #004d99;
-            --accent: #e63946;
-            --accent-light: #ff6b6b;
-            --bg: #f0f2f5;
-            --card: #ffffff;
-            --text: #1a1a2e;
-            --text-muted: #6c757d;
-            --success: #2ecc71;
-            --warning: #f39c12;
-            --border: #e0e0e0;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-        }
-
-        /* Login Screen */
-        #login-screen {
-            position: fixed;
-            inset: 0;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-        }
-
-        .login-box {
-            background: white;
-            border-radius: 16px;
-            padding: 48px 40px;
-            width: 400px;
-            max-width: 90vw;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            text-align: center;
-        }
-
-        .login-box h1 {
-            font-size: 1.5rem;
-            color: var(--primary);
-            margin-bottom: 8px;
-        }
-
-        .login-box p {
-            color: var(--text-muted);
-            margin-bottom: 24px;
-            font-size: 0.9rem;
-        }
-
-        .login-box input {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid var(--border);
-            border-radius: 8px;
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .login-box input:focus {
-            border-color: var(--primary);
-        }
-
-        .login-box button {
-            width: 100%;
-            padding: 14px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 16px;
-            transition: background 0.2s;
-        }
-
-        .login-box button:hover { background: var(--primary-light); }
-
-        .login-error {
-            color: var(--accent);
-            font-size: 0.85rem;
-            margin-top: 12px;
-            display: none;
-        }
-
-        /* Dashboard */
-        #dashboard { display: none; }
-
-        .header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-            color: white;
-            padding: 32px 40px;
-        }
-
-        .header h1 { font-size: 1.8rem; font-weight: 700; }
-        .header .subtitle {
-            opacity: 0.85;
-            font-size: 0.95rem;
-            margin-top: 4px;
-        }
-
-        .header .meta {
-            display: flex;
-            gap: 24px;
-            margin-top: 16px;
-            flex-wrap: wrap;
-        }
-
-        .header .meta span {
-            background: rgba(255,255,255,0.15);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        /* KPI Cards */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .kpi-card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-            border-left: 4px solid var(--primary);
-        }
-
-        .kpi-card.highlight { border-left-color: var(--success); }
-        .kpi-card.warning { border-left-color: var(--warning); }
-        .kpi-card.danger { border-left-color: var(--accent); }
-
-        .kpi-label {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-
-        .kpi-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--text);
-        }
-
-        .kpi-sub {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        /* Section */
-        .section {
-            margin-bottom: 24px;
-        }
-
-        .section-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--primary);
-            margin-bottom: 16px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid var(--border);
-        }
-
-        /* Chart Grid */
-        .chart-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
-            gap: 20px;
-            margin-bottom: 24px;
-        }
-
-        .chart-card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        }
-
-        .chart-card h3 {
-            font-size: 0.95rem;
-            color: var(--text);
-            margin-bottom: 16px;
-        }
-
-        .chart-card canvas {
-            max-height: 320px;
-        }
-
-        .chart-card-full {
-            grid-column: 1 / -1;
-        }
-
-        /* Table */
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-        }
-
-        .data-table th {
-            background: var(--primary);
-            color: white;
-            padding: 10px 14px;
-            text-align: left;
-            font-weight: 600;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-
-        .data-table th:first-child { border-radius: 8px 0 0 0; }
-        .data-table th:last-child { border-radius: 0 8px 0 0; }
-
-        .data-table td {
-            padding: 10px 14px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .data-table tr:hover td { background: #f8f9fa; }
-        .data-table tr:last-child td { border-bottom: none; }
-
-        .data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-
-        .badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .badge-paid { background: #fff3cd; color: #856404; }
-        .badge-organic { background: #d4edda; color: #155724; }
-        .badge-direct { background: #d1ecf1; color: #0c5460; }
-        .badge-social { background: #f8d7da; color: #721c24; }
-        .badge-display { background: #e2e3e5; color: #383d41; }
-        .badge-referral { background: #cce5ff; color: #004085; }
-
-        .footer {
-            text-align: center;
-            padding: 32px 24px;
-            color: var(--text-muted);
-            font-size: 0.8rem;
-        }
-
-        @media (max-width: 768px) {
-            .header { padding: 20px; }
-            .header h1 { font-size: 1.3rem; }
-            .container { padding: 16px; }
-            .chart-grid { grid-template-columns: 1fr; }
-            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-    </style>
 </head>
 <body>
 
-<!-- Login Screen -->
+<!-- Login -->
 <div id="login-screen">
     <div class="login-box">
         <h1>FOM Web-Analyse</h1>
         <p>Bitte Passwort eingeben, um das Dashboard zu sehen.</p>
         <input type="password" id="password-input" placeholder="Passwort" autofocus>
-        <button onclick="checkPassword()">Zugang</button>
+        <button id="login-btn">Zugang</button>
         <div class="login-error" id="login-error">Falsches Passwort. Bitte erneut versuchen.</div>
     </div>
 </div>
 
 <!-- Dashboard -->
 <div id="dashboard">
+
+    <!-- Header -->
     <div class="header">
-        <h1>Hochschulwechsel – Web-Analyse Dashboard</h1>
-        <div class="subtitle">fom.de/hochschulwechsel</div>
-        <div class="meta">
-            <span>01.01.2026 – 01.04.2026</span>
-            <span>Property: FOM – GA4</span>
-            <span>90 Tage</span>
+        <div class="header-top">
+            <div>
+                <h1>FOM Web-Analyse Dashboard</h1>
+                <div class="meta">Property: FOM – GA4 | Daten vom 01.04.2026</div>
+            </div>
         </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <div class="control-group">
+            <label>Seite</label>
+            <select id="page-select"></select>
+        </div>
+        <div class="control-group">
+            <label>Von</label>
+            <input type="date" id="date-start">
+        </div>
+        <div class="control-group">
+            <label>Bis</label>
+            <input type="date" id="date-end">
+        </div>
+        <button class="btn btn-primary" id="date-apply">Anwenden</button>
+        <div class="presets">
+            <button class="btn btn-preset" data-days="7">7 Tage</button>
+            <button class="btn btn-preset" data-days="30">30 Tage</button>
+            <button class="btn btn-preset active" data-days="0">Gesamt</button>
+        </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="overview">Übersicht</button>
+        <button class="tab-btn" data-tab="traffic">Traffic</button>
+        <button class="tab-btn" data-tab="sources">Quellen</button>
+        <button class="tab-btn" data-tab="devices">Geräte & Geo</button>
+        <button class="tab-btn" data-tab="conversions">Conversions</button>
+        <button class="tab-btn" data-tab="paths">Pfade</button>
     </div>
 
     <div class="container">
 
-        <!-- KPI Cards -->
-        <div class="section">
-            <div class="section-title">Kennzahlen im Überblick</div>
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-label">Seitenaufrufe</div>
-                    <div class="kpi-value">2.738</div>
-                    <div class="kpi-sub">Ø 30/Tag</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Sessions</div>
-                    <div class="kpi-value">1.235</div>
-                    <div class="kpi-sub">Ø 14/Tag</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Nutzer</div>
-                    <div class="kpi-value">1.168</div>
-                    <div class="kpi-sub">85% neue Nutzer</div>
-                </div>
-                <div class="kpi-card highlight">
-                    <div class="kpi-label">Engagement Rate</div>
-                    <div class="kpi-value">98,7%</div>
-                    <div class="kpi-sub">Hervorragend</div>
-                </div>
-                <div class="kpi-card highlight">
-                    <div class="kpi-label">Bounce Rate</div>
-                    <div class="kpi-value">1,3%</div>
-                    <div class="kpi-sub">Extrem niedrig</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Ø Sitzungsdauer</div>
-                    <div class="kpi-value">68s</div>
-                    <div class="kpi-sub">1 Min. 8 Sek.</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Seiten / Sitzung</div>
-                    <div class="kpi-value">2,24</div>
-                    <div class="kpi-sub">Gute Navigation</div>
-                </div>
-                <div class="kpi-card highlight">
-                    <div class="kpi-label">Conversions (in Session)</div>
-                    <div class="kpi-value">21</div>
-                    <div class="kpi-sub">2,1% Conversion Rate</div>
+        <!-- KPI Cards (always visible) -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Seitenaufrufe</div>
+                <div class="kpi-value" id="kpi-pv">–</div>
+                <div class="kpi-sub" id="kpi-pv-sub"></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Sessions</div>
+                <div class="kpi-value" id="kpi-sessions">–</div>
+                <div class="kpi-sub" id="kpi-sessions-sub"></div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Nutzer</div>
+                <div class="kpi-value" id="kpi-users">–</div>
+                <div class="kpi-sub" id="kpi-users-sub"></div>
+            </div>
+            <div class="kpi-card highlight">
+                <div class="kpi-label">Engagement Rate</div>
+                <div class="kpi-value" id="kpi-engagement">–</div>
+                <div class="kpi-sub">Interaktionsrate</div>
+            </div>
+            <div class="kpi-card highlight">
+                <div class="kpi-label">Bounce Rate</div>
+                <div class="kpi-value" id="kpi-bounce">–</div>
+                <div class="kpi-sub">Absprungrate</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Ø Sitzungsdauer</div>
+                <div class="kpi-value" id="kpi-duration">–</div>
+                <div class="kpi-sub">Sekunden</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Seiten / Sitzung</div>
+                <div class="kpi-value" id="kpi-pages">–</div>
+                <div class="kpi-sub">Navigation</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Conversions</div>
+                <div class="kpi-value" id="kpi-conversions">–</div>
+                <div class="kpi-sub" id="kpi-conversions-sub"></div>
+            </div>
+        </div>
+
+        <!-- Tab: Übersicht -->
+        <div class="tab-content active" id="tab-overview">
+            <div class="section">
+                <div class="section-title">Täglicher Traffic-Verlauf</div>
+                <div class="chart-card chart-card-full" style="height:320px">
+                    <canvas id="chart-trend"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- Charts Row 1: Traffic Trend + Sources -->
-        <div class="section">
-            <div class="section-title">Traffic-Analyse</div>
-            <div class="chart-grid">
-                <div class="chart-card chart-card-full">
-                    <h3>Täglicher Traffic-Verlauf (Seitenaufrufe)</h3>
-                    <canvas id="trendChart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Traffic-Quellen (Sessions)</h3>
-                    <canvas id="sourcesChart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Paid vs. Organic vs. Sonstige</h3>
-                    <canvas id="paidOrganicChart"></canvas>
+        <!-- Tab: Traffic -->
+        <div class="tab-content" id="tab-traffic">
+            <div class="section">
+                <div class="section-title">Traffic-Verlauf im Detail</div>
+                <div class="chart-card chart-card-full" style="height:350px">
+                    <canvas id="chart-traffic-trend"></canvas>
                 </div>
             </div>
         </div>
 
-        <!-- Traffic Sources Table -->
-        <div class="section">
-            <div class="section-title">Traffic-Quellen im Detail</div>
-            <div class="chart-card">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Kanal</th>
-                            <th>Quelle / Medium</th>
-                            <th class="num">Sessions</th>
-                            <th class="num">Nutzer</th>
-                            <th class="num">Anteil</th>
-                            <th class="num">Engagement</th>
-                            <th class="num">Ø Dauer</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><span class="badge badge-paid">Paid Search</span></td>
-                            <td>google / cpc</td>
-                            <td class="num">783</td>
-                            <td class="num">753</td>
-                            <td class="num">63,4%</td>
-                            <td class="num">99,0%</td>
-                            <td class="num">60s</td>
-                        </tr>
-                        <tr>
-                            <td><span class="badge badge-paid">Cross-Network</span></td>
-                            <td>google / cpc</td>
-                            <td class="num">326</td>
-                            <td class="num">308</td>
-                            <td class="num">26,4%</td>
-                            <td class="num">99,1%</td>
-                            <td class="num">49s</td>
-                        </tr>
-                        <tr>
-                            <td><span class="badge badge-paid">Paid Search</span></td>
-                            <td>bing / cpc</td>
-                            <td class="num">34</td>
-                            <td class="num">32</td>
-                            <td class="num">2,8%</td>
-                            <td class="num">100%</td>
-                            <td class="num">90s</td>
-                        </tr>
-                        <tr>
-                            <td><span class="badge badge-direct">Direct</span></td>
-                            <td>(direct) / (none)</td>
-                            <td class="num">25</td>
-                            <td class="num">23</td>
-                            <td class="num">2,0%</td>
-                            <td class="num">96,0%</td>
-                            <td class="num">240s</td>
-                        </tr>
-                        <tr>
-                            <td><span class="badge badge-display">Display</span></td>
-                            <td>outbrain / display</td>
-                            <td class="num">22</td>
-                            <td class="num">21</td>
-                            <td class="num">1,8%</td>
-                            <td class="num">100%</td>
-                            <td class="num">60s</td>
-                        </tr>
-                        <tr>
-                            <td><span class="badge badge-organic">Organic Search</span></td>
-                            <td>google / organic</td>
-                            <td class="num">19</td>
-                            <td class="num">15</td>
-                            <td class="num">1,5%</td>
-                            <td class="num">84,2%</td>
-                            <td class="num">114s</td>
-                        </tr>
-                        <tr>
-                            <td><span class="badge badge-social">Paid Social</span></td>
-                            <td>xing, facebook</td>
-                            <td class="num">6</td>
-                            <td class="num">6</td>
-                            <td class="num">0,5%</td>
-                            <td class="num">100%</td>
-                            <td class="num">22s</td>
-                        </tr>
-                        <tr>
-                            <td><span class="badge badge-referral">Referral</span></td>
-                            <td>sistrix, asana, telekom</td>
-                            <td class="num">5</td>
-                            <td class="num">4</td>
-                            <td class="num">0,4%</td>
-                            <td class="num">100%</td>
-                            <td class="num">719s</td>
-                        </tr>
-                    </tbody>
-                </table>
+        <!-- Tab: Quellen -->
+        <div class="tab-content" id="tab-sources">
+            <div class="section">
+                <div class="section-title">Traffic-Quellen</div>
+                <div class="chart-grid">
+                    <div class="chart-card">
+                        <h3>Verteilung nach Kanal</h3>
+                        <canvas id="chart-sources-donut"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Paid vs. Organic vs. Sonstige</h3>
+                        <canvas id="chart-paid-organic"></canvas>
+                    </div>
+                </div>
             </div>
-        </div>
-
-        <!-- Charts Row 2: Devices + Events -->
-        <div class="section">
-            <div class="section-title">Geräte, Events & Geografie</div>
-            <div class="chart-grid">
-                <div class="chart-card">
-                    <h3>Geräteverteilung (Sessions)</h3>
-                    <canvas id="deviceChart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Ø Sitzungsdauer nach Gerät</h3>
-                    <canvas id="deviceDurationChart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Events auf der Seite</h3>
-                    <canvas id="eventsChart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Top-Städte (Sessions)</h3>
-                    <canvas id="citiesChart"></canvas>
+            <div class="section">
+                <div class="section-title">Quellen im Detail</div>
+                <div class="chart-card" id="table-sources">
+                    <div class="empty-state">Keine Quellen-Daten verfügbar</div>
                 </div>
             </div>
         </div>
 
-        <!-- Conversion Funnel -->
-        <div class="section">
-            <div class="section-title">Conversion-Pfade aus Hochschulwechsel-Sessions</div>
-            <div class="chart-grid">
-                <div class="chart-card">
-                    <h3>Conversion-Funnel (Sessions mit Landing Page /hochschulwechsel)</h3>
-                    <canvas id="funnelChart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Conversion-Seiten (wo Conversions stattfinden)</h3>
-                    <canvas id="conversionPagesChart"></canvas>
+        <!-- Tab: Geräte & Geo -->
+        <div class="tab-content" id="tab-devices">
+            <div class="section">
+                <div class="section-title">Geräte & Geografie</div>
+                <div class="chart-grid">
+                    <div class="chart-card">
+                        <h3>Geräteverteilung</h3>
+                        <canvas id="chart-device-donut"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Ø Sitzungsdauer nach Gerät</h3>
+                        <canvas id="chart-device-duration"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Top-Städte</h3>
+                        <canvas id="chart-cities"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Events auf der Seite</h3>
+                        <canvas id="chart-events"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Top Follow-Up Pages Table -->
-        <div class="section">
-            <div class="section-title">Top-Folgeseiten nach /hochschulwechsel</div>
-            <div class="chart-card">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Folgeseite</th>
-                            <th class="num">Nutzer</th>
-                            <th class="num">Seitenaufrufe</th>
-                            <th class="num">Conversions</th>
-                            <th class="num">Conv. Rate</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>/studiengangsfinder.html</td>
-                            <td class="num">50</td>
-                            <td class="num">213</td>
-                            <td class="num">0</td>
-                            <td class="num">–</td>
-                        </tr>
-                        <tr>
-                            <td>/ (Startseite)</td>
-                            <td class="num">35</td>
-                            <td class="num">78</td>
-                            <td class="num">1</td>
-                            <td class="num">2,9%</td>
-                        </tr>
-                        <tr>
-                            <td>/de/das-studium/studiengangsfinder.html</td>
-                            <td class="num">34</td>
-                            <td class="num">143</td>
-                            <td class="num">0</td>
-                            <td class="num">–</td>
-                        </tr>
-                        <tr>
-                            <td>/anrechnung/</td>
-                            <td class="num">33</td>
-                            <td class="num">38</td>
-                            <td class="num">0</td>
-                            <td class="num">–</td>
-                        </tr>
-                        <tr>
-                            <td>/bachelor.html</td>
-                            <td class="num">32</td>
-                            <td class="num">125</td>
-                            <td class="num">1</td>
-                            <td class="num">3,1%</td>
-                        </tr>
-                        <tr>
-                            <td>/anmeldung.html</td>
-                            <td class="num">19</td>
-                            <td class="num">40</td>
-                            <td class="num">0</td>
-                            <td class="num">–</td>
-                        </tr>
-                        <tr>
-                            <td>/info-material/</td>
-                            <td class="num">18</td>
-                            <td class="num">20</td>
-                            <td class="num">0</td>
-                            <td class="num">–</td>
-                        </tr>
-                        <tr style="background:#f0fff0">
-                            <td>/sofortcheck.html</td>
-                            <td class="num">15</td>
-                            <td class="num">32</td>
-                            <td class="num"><strong>2</strong></td>
-                            <td class="num"><strong>13,3%</strong></td>
-                        </tr>
-                        <tr>
-                            <td>/business-administration-ba.html</td>
-                            <td class="num">18</td>
-                            <td class="num">44</td>
-                            <td class="num">0</td>
-                            <td class="num">–</td>
-                        </tr>
-                        <tr style="background:#f0fff0">
-                            <td>/studienberatung.html</td>
-                            <td class="num">11</td>
-                            <td class="num">28</td>
-                            <td class="num"><strong>2</strong></td>
-                            <td class="num"><strong>18,2%</strong></td>
-                        </tr>
-                        <tr style="background:#f0fff0">
-                            <td>/infomaterial.html</td>
-                            <td class="num">4</td>
-                            <td class="num">10</td>
-                            <td class="num"><strong>5</strong></td>
-                            <td class="num"><strong>125%</strong></td>
-                        </tr>
-                        <tr style="background:#f0fff0">
-                            <td>/anrechnung</td>
-                            <td class="num">4</td>
-                            <td class="num">10</td>
-                            <td class="num"><strong>5</strong></td>
-                            <td class="num"><strong>125%</strong></td>
-                        </tr>
-                    </tbody>
-                </table>
+        <!-- Tab: Conversions -->
+        <div class="tab-content" id="tab-conversions">
+            <div class="section">
+                <div class="section-title">Conversion-Analyse</div>
+                <div class="chart-grid">
+                    <div class="chart-card">
+                        <h3>Conversion-Funnel</h3>
+                        <canvas id="chart-funnel"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Seiten mit Conversions</h3>
+                        <canvas id="chart-conv-pages"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-title">Folgeseiten mit Conversion-Rate</div>
+                <div class="chart-card" id="table-followup">
+                    <div class="empty-state">Keine Conversion-Daten verfügbar</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Pfade -->
+        <div class="tab-content" id="tab-paths">
+            <div class="section">
+                <div class="section-title">Nutzer-Pfade & Navigation</div>
+                <div id="flow-container">
+                    <div class="empty-state">Keine Pfad-Daten verfügbar</div>
+                </div>
             </div>
         </div>
 
     </div>
 
     <div class="footer">
-        FOM Hochschulwechsel – Web-Analyse Dashboard | Datenquelle: Google Analytics 4 | Erstellt am 01.04.2026
+        FOM Web-Analyse Dashboard | Datenquelle: Google Analytics 4 | Erstellt am 01.04.2026
     </div>
 </div>
 
+<script src="js/charts.js"></script>
+<script src="js/tables.js"></script>
+<script src="js/app.js"></script>
 <script>
-// Password check
-const HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'; // not used, simple check
-
-function checkPassword() {
-    const input = document.getElementById('password-input').value;
-    if (input === 'Fom!1991') {
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('dashboard').style.display = 'block';
-        initCharts();
-    } else {
-        document.getElementById('login-error').style.display = 'block';
-        document.getElementById('password-input').value = '';
-        document.getElementById('password-input').focus();
-    }
-}
-
-document.getElementById('password-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') checkPassword();
-});
-
-// Chart colors
-const COLORS = {
-    primary: '#003366',
-    primaryLight: '#004d99',
-    accent: '#e63946',
-    success: '#2ecc71',
-    warning: '#f39c12',
-    blue: '#3498db',
-    purple: '#9b59b6',
-    orange: '#e67e22',
-    teal: '#1abc9c',
-    pink: '#e84393',
-    grey: '#95a5a6'
-};
-
-const PALETTE = ['#003366','#e63946','#2ecc71','#f39c12','#3498db','#9b59b6','#e67e22','#1abc9c','#e84393','#95a5a6'];
-
-function initCharts() {
-    Chart.defaults.font.family = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-    Chart.defaults.font.size = 12;
-    Chart.defaults.color = '#6c757d';
-
-    createTrendChart();
-    createSourcesChart();
-    createPaidOrganicChart();
-    createDeviceChart();
-    createDeviceDurationChart();
-    createEventsChart();
-    createCitiesChart();
-    createFunnelChart();
-    createConversionPagesChart();
-}
-
-function createTrendChart() {
-    const data = [
-        {d:'01.01',v:20},{d:'02.01',v:20},{d:'03.01',v:30},{d:'04.01',v:22},{d:'05.01',v:55},{d:'06.01',v:75},{d:'07.01',v:84},
-        {d:'08.01',v:73},{d:'09.01',v:72},{d:'10.01',v:50},{d:'11.01',v:54},{d:'12.01',v:34},{d:'13.01',v:24},{d:'14.01',v:46},
-        {d:'15.01',v:32},{d:'16.01',v:23},{d:'17.01',v:14},{d:'18.01',v:29},{d:'19.01',v:8},{d:'20.01',v:41},{d:'21.01',v:32},
-        {d:'22.01',v:26},{d:'23.01',v:33},{d:'24.01',v:29},{d:'25.01',v:33},{d:'26.01',v:12},{d:'27.01',v:17},{d:'28.01',v:32},
-        {d:'29.01',v:18},{d:'30.01',v:29},{d:'31.01',v:17},
-        {d:'01.02',v:27},{d:'02.02',v:19},{d:'03.02',v:20},{d:'04.02',v:23},{d:'05.02',v:23},{d:'06.02',v:12},{d:'07.02',v:18},
-        {d:'08.02',v:14},{d:'09.02',v:24},{d:'10.02',v:32},{d:'11.02',v:16},{d:'12.02',v:17},{d:'13.02',v:22},{d:'14.02',v:22},
-        {d:'15.02',v:14},{d:'16.02',v:22},{d:'17.02',v:22},{d:'18.02',v:60},{d:'19.02',v:50},{d:'20.02',v:68},{d:'21.02',v:50},
-        {d:'22.02',v:31},{d:'23.02',v:67},{d:'24.02',v:57},{d:'25.02',v:51},{d:'26.02',v:40},{d:'27.02',v:21},{d:'28.02',v:19},
-        {d:'01.03',v:29},{d:'02.03',v:50},{d:'03.03',v:28},{d:'04.03',v:38},{d:'05.03',v:60},{d:'06.03',v:38},{d:'07.03',v:47},
-        {d:'08.03',v:31},{d:'09.03',v:20},{d:'10.03',v:32},{d:'11.03',v:22},{d:'12.03',v:22},{d:'13.03',v:23},{d:'14.03',v:18},
-        {d:'15.03',v:14},{d:'16.03',v:34},{d:'17.03',v:48},{d:'18.03',v:24},{d:'19.03',v:43},{d:'20.03',v:36},{d:'21.03',v:16},
-        {d:'22.03',v:12},{d:'23.03',v:10},{d:'24.03',v:16},{d:'25.03',v:6},{d:'26.03',v:14},{d:'27.03',v:14},{d:'28.03',v:12},
-        {d:'29.03',v:24},{d:'30.03',v:12}
-    ];
-
-    new Chart(document.getElementById('trendChart'), {
-        type: 'line',
-        data: {
-            labels: data.map(d => d.d),
-            datasets: [{
-                label: 'Seitenaufrufe',
-                data: data.map(d => d.v),
-                borderColor: COLORS.primary,
-                backgroundColor: 'rgba(0,51,102,0.08)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 1.5,
-                pointHoverRadius: 5,
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        title: (items) => items[0].label + '.2026'
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { maxTicksLimit: 15 }
-                },
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#f0f0f0' }
-                }
-            }
-        }
-    });
-}
-
-function createSourcesChart() {
-    new Chart(document.getElementById('sourcesChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Paid Search (Google)', 'Cross-Network (Google)', 'Paid Search (Bing)', 'Direct', 'Display', 'Organic Search', 'Paid Social', 'Referral'],
-            datasets: [{
-                data: [783, 326, 34, 25, 23, 20, 6, 5],
-                backgroundColor: PALETTE,
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'right',
-                    labels: { boxWidth: 12, padding: 10, font: { size: 11 } }
-                }
-            }
-        }
-    });
-}
-
-function createPaidOrganicChart() {
-    new Chart(document.getElementById('paidOrganicChart'), {
-        type: 'bar',
-        data: {
-            labels: ['Paid (Google+Bing+Social+Display)', 'Organic Search', 'Direct', 'Referral'],
-            datasets: [{
-                label: 'Sessions',
-                data: [1172, 20, 25, 5],
-                backgroundColor: [COLORS.accent, COLORS.success, COLORS.blue, COLORS.teal],
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            indexAxis: 'y',
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => ctx.raw + ' Sessions (' + Math.round(ctx.raw/1235*100) + '%)'
-                    }
-                }
-            },
-            scales: {
-                x: { beginAtZero: true, grid: { color: '#f0f0f0' } },
-                y: { grid: { display: false } }
-            }
-        }
-    });
-}
-
-function createDeviceChart() {
-    new Chart(document.getElementById('deviceChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Mobile (65,3%)', 'Desktop (33,6%)', 'Tablet (1,1%)'],
-            datasets: [{
-                data: [806, 415, 14],
-                backgroundColor: [COLORS.primary, COLORS.accent, COLORS.warning],
-                borderWidth: 2,
-                borderColor: '#fff'
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { boxWidth: 12, padding: 14 }
-                }
-            }
-        }
-    });
-}
-
-function createDeviceDurationChart() {
-    new Chart(document.getElementById('deviceDurationChart'), {
-        type: 'bar',
-        data: {
-            labels: ['Mobile', 'Desktop', 'Tablet'],
-            datasets: [{
-                label: 'Ø Sitzungsdauer (Sekunden)',
-                data: [42, 117, 27],
-                backgroundColor: [COLORS.primary, COLORS.accent, COLORS.warning],
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#f0f0f0' },
-                    ticks: { callback: v => v + 's' }
-                },
-                x: { grid: { display: false } }
-            }
-        }
-    });
-}
-
-function createEventsChart() {
-    new Chart(document.getElementById('eventsChart'), {
-        type: 'bar',
-        data: {
-            labels: ['page_view', 'session_start', 'first_visit', 'user_engagement', 'scroll', 'link_click_internal'],
-            datasets: [{
-                label: 'Event-Anzahl',
-                data: [2738, 1037, 992, 819, 308, 213],
-                backgroundColor: [COLORS.primary, COLORS.primaryLight, COLORS.blue, COLORS.teal, COLORS.success, COLORS.warning],
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            indexAxis: 'y',
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { beginAtZero: true, grid: { color: '#f0f0f0' } },
-                y: { grid: { display: false } }
-            }
-        }
-    });
-}
-
-function createCitiesChart() {
-    new Chart(document.getElementById('citiesChart'), {
-        type: 'bar',
-        data: {
-            labels: ['Berlin', 'Frankfurt a.M.', 'Hamburg', 'Cologne', 'Essen', 'Munich'],
-            datasets: [
-                {
-                    label: 'Mobile',
-                    data: [38, 19, 30, 26, 0, 17],
-                    backgroundColor: COLORS.primary,
-                    borderRadius: 4
-                },
-                {
-                    label: 'Desktop',
-                    data: [20, 22, 0, 0, 25, 0],
-                    backgroundColor: COLORS.accent,
-                    borderRadius: 4
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { boxWidth: 12, padding: 14 }
-                }
-            },
-            scales: {
-                x: { stacked: true, grid: { display: false } },
-                y: { stacked: true, beginAtZero: true, grid: { color: '#f0f0f0' } }
-            }
-        }
-    });
-}
-
-function createFunnelChart() {
-    new Chart(document.getElementById('funnelChart'), {
-        type: 'bar',
-        data: {
-            labels: [
-                'Sessions gesamt',
-                'Studiengangsfinder besucht',
-                'Anrechnung besucht',
-                'Anmeldung besucht',
-                'Infomaterial angefragt',
-                'Sofortcheck gemacht',
-                'Studienberatung kontaktiert',
-                'Conversions (gesamt)'
-            ],
-            datasets: [{
-                label: 'Nutzer',
-                data: [1020, 84, 38, 19, 18, 15, 16, 21],
-                backgroundColor: [
-                    '#003366', '#004d99', '#3498db', '#1abc9c',
-                    '#2ecc71', '#f39c12', '#e67e22', '#e63946'
-                ],
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            indexAxis: 'y',
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: (ctx) => {
-                            const pct = Math.round(ctx.raw / 1020 * 100 * 10) / 10;
-                            return ctx.raw + ' Nutzer (' + pct + '% der Sessions)';
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: { beginAtZero: true, grid: { color: '#f0f0f0' } },
-                y: { grid: { display: false } }
-            }
-        }
-    });
-}
-
-function createConversionPagesChart() {
-    new Chart(document.getElementById('conversionPagesChart'), {
-        type: 'bar',
-        data: {
-            labels: [
-                'Infomaterial',
-                'Anrechnung',
-                'Sofortcheck',
-                'Studienberatung',
-                'Startseite',
-                'Bachelor-Übersicht',
-                'Soziale Arbeit BA',
-                'Studienberatung (de)',
-                'FAQ Studienberatung',
-                'Studienfinanzierung',
-                'Master IT-Mgmt'
-            ],
-            datasets: [{
-                label: 'Conversions',
-                data: [5, 5, 2, 2, 1, 1, 1, 1, 1, 1, 1],
-                backgroundColor: COLORS.accent,
-                borderRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            indexAxis: 'y',
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    grid: { color: '#f0f0f0' },
-                    ticks: { stepSize: 1 }
-                },
-                y: { grid: { display: false } }
-            }
-        }
-    });
-}
+    // Data will be loaded here
+    fetch('data/data.json')
+        .then(r => r.json())
+        .then(data => App.init(data))
+        .catch(() => {
+            // Fallback: try inline data
+            if (typeof DASHBOARD_DATA !== 'undefined') App.init(DASHBOARD_DATA);
+        });
 </script>
 
 </body>
