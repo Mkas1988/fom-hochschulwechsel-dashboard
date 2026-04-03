@@ -9,6 +9,25 @@ const App = (() => {
         activeTab: 'overview'
     };
 
+    // Key conversion funnel steps (filter out irrelevant ones)
+    const KEY_CONV_STEPS = [
+        'Sessions', 'Conversions',
+        'thank-you-page-anmeldung', 'thank-you-page-infomaterial',
+        'thank-you-page-dualmatch', 'anmeldung',
+        'studienberatung', 'studienberatung-oa'
+    ];
+
+    const KEY_CONV_LABELS = {
+        'Sessions': 'Sessions',
+        'Conversions': 'Gesamt-Conversions',
+        'thank-you-page-anmeldung': 'Online-Anmeldung',
+        'thank-you-page-infomaterial': 'Infomaterial-Bestellung',
+        'thank-you-page-dualmatch': 'DualMatch-Anfrage',
+        'anmeldung': 'Anmeldung (Formular)',
+        'studienberatung': 'Studienberatung',
+        'studienberatung-oa': 'Studienberatung (Online)'
+    };
+
     // ── Init ──
     function init(detailedData, pageIndex) {
         DATA = detailedData;
@@ -72,7 +91,7 @@ const App = (() => {
                 opt.textContent = p.label + '  ·  ' + sessions + ' Sessions';
                 // Mark pages with detailed data
                 const hasDetail = DATA.pages.some(dp => dp.path === p.path);
-                if (!hasDetail) opt.style.color = '#999';
+                if (!hasDetail) opt.style.color = '#9a9a9a';
                 sel.appendChild(opt);
             });
 
@@ -89,6 +108,16 @@ const App = (() => {
             state.pagePath = sel.value;
             renderAll();
         });
+    }
+
+    // ── Select page from traffic bars ──
+    function selectPage(path) {
+        const sel = document.getElementById('page-select');
+        state.pagePath = path;
+        sel.value = path;
+        renderAll();
+        // Scroll to KPIs
+        document.querySelector('.kpi-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // ── Datepicker ──
@@ -190,6 +219,17 @@ const App = (() => {
         };
     }
 
+    // ── Filter conversions to key events only ──
+    function filterKeyConversions(funnel) {
+        if (!funnel) return [];
+        return funnel
+            .filter(f => KEY_CONV_STEPS.includes(f.step))
+            .map(f => ({
+                step: KEY_CONV_LABELS[f.step] || f.step,
+                count: f.count
+            }));
+    }
+
     // ── Render ──
     function renderAll() {
         const detailed = getDetailedPage();
@@ -268,40 +308,45 @@ const App = (() => {
 
     function renderTab(tab) {
         const page = getDetailedPage();
-        if (!page) return;
         const daily = getFilteredDaily();
 
         switch (tab) {
             case 'overview':
-                Charts.trendLine('chart-trend', daily);
+                // Always render traffic distribution from INDEX
+                Charts.trafficBars('traffic-bars', INDEX.pages, INDEX.categories, selectPage);
+                Charts.categoryDonut('chart-category-donut', INDEX.pages, INDEX.categories);
+                if (page) Charts.trendLine('chart-trend', daily);
                 break;
             case 'traffic':
-                Charts.trendLine('chart-traffic-trend', daily);
+                if (page) Charts.trendLine('chart-traffic-trend', daily);
                 break;
             case 'sources':
-                if (page.sources?.length) {
+                if (page?.sources?.length) {
                     Charts.sourcesDoughnut('chart-sources-donut', page.sources);
                     Charts.paidVsOrganic('chart-paid-organic', page.sources);
                     Tables.sourcesTable('table-sources', page.sources);
                 }
                 break;
             case 'devices':
-                if (page.devices?.length) {
+                if (page?.devices?.length) {
                     Charts.deviceDoughnut('chart-device-donut', page.devices);
                     Charts.deviceDuration('chart-device-duration', page.devices);
                 }
-                if (page.cities?.length) Charts.citiesBar('chart-cities', page.cities);
-                if (page.events?.length) Charts.eventsBar('chart-events', page.events);
+                if (page?.cities?.length) Charts.citiesBar('chart-cities', page.cities);
+                if (page?.events?.length) Charts.eventsBar('chart-events', page.events);
                 break;
             case 'conversions':
-                if (page.conversions?.funnel?.length) Charts.funnelBar('chart-funnel', page.conversions.funnel);
-                if (page.conversions?.followUpPages?.length) {
+                if (page?.conversions?.funnel?.length) {
+                    const filtered = filterKeyConversions(page.conversions.funnel);
+                    if (filtered.length > 0) Charts.funnelBar('chart-funnel', filtered);
+                }
+                if (page?.conversions?.followUpPages?.length) {
                     Charts.conversionPagesBar('chart-conv-pages', page.conversions.followUpPages);
                     Tables.followUpTable('table-followup', page.conversions.followUpPages);
                 }
                 break;
             case 'paths':
-                if (page.conversions?.followUpPages?.length) {
+                if (page?.conversions?.followUpPages?.length) {
                     Tables.flowTable('flow-container', page.conversions.followUpPages);
                 }
                 break;

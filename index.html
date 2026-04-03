@@ -120,6 +120,19 @@
         <!-- Tab: Übersicht -->
         <div class="tab-content active" id="tab-overview">
             <div class="section">
+                <div class="section-title">Traffic-Verteilung aller Seiten</div>
+                <div class="traffic-dist-grid">
+                    <div class="chart-card">
+                        <h3>Top-Seiten nach Sessions</h3>
+                        <div id="traffic-bars"></div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Verteilung nach Kategorie</h3>
+                        <canvas id="chart-category-donut"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="section">
                 <div class="section-title">Täglicher Traffic-Verlauf</div>
                 <div class="chart-card chart-card-full" style="height:320px">
                     <canvas id="chart-trend"></canvas>
