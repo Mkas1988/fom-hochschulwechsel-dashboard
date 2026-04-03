@@ -23,13 +23,18 @@ const Charts = (() => {
 
     function render(id, config) {
         const el = document.getElementById(id);
-        if (!el) return;
+        if (!el) return null;
         if (instances[id]) instances[id].destroy();
         instances[id] = new Chart(el, config);
+        return instances[id];
     }
 
     function fmt(n) {
         return n.toLocaleString('de-DE');
+    }
+
+    function shortenPath(p) {
+        return p.replace(/^\/de\//, '/').replace(/\.html$/, '').replace(/^\/hochschulbereiche\/[^/]+\//, '').split('/').pop() || p;
     }
 
     // ── Traffic Distribution: Category Donut ──
@@ -50,14 +55,14 @@ const Charts = (() => {
                 datasets: [{ data, backgroundColor: colors, borderWidth: 3, borderColor: '#fff' }]
             },
             options: {
-                responsive: true,
+                responsive: true, maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'right', labels: { boxWidth: 12, padding: 12, font: { size: 11, weight: 'bold' } } },
+                    legend: { position: 'right', labels: { boxWidth: 12, padding: 8, font: { size: 10, weight: 'bold' } } },
                     tooltip: {
                         callbacks: {
                             label: ctx => {
                                 const total = data.reduce((a, b) => a + b, 0);
-                                return ctx.label + ': ' + fmt(ctx.raw) + ' Sessions (' + Math.round(ctx.raw / total * 100) + '%)';
+                                return ctx.label + ': ' + fmt(ctx.raw) + ' (' + Math.round(ctx.raw / total * 100) + '%)';
                             }
                         }
                     }
@@ -66,7 +71,7 @@ const Charts = (() => {
         });
     }
 
-    // ── Traffic Distribution: Bar List (HTML, not Chart.js) ──
+    // ── Traffic Distribution: Bar List (HTML) ──
     function trafficBars(containerId, pages, categories, onSelect) {
         const el = document.getElementById(containerId);
         if (!el) return;
@@ -91,42 +96,100 @@ const Charts = (() => {
         html += '</div>';
         el.innerHTML = html;
 
-        // Click handler
         if (onSelect) {
             el.querySelectorAll('.traffic-bar-row').forEach(row => {
-                row.addEventListener('click', () => {
-                    onSelect(row.dataset.path);
-                });
+                row.addEventListener('click', () => onSelect(row.dataset.path));
             });
         }
     }
 
-    // ── Tab: Übersicht ──
+    // ── Treemap ──
+    function trafficTreemap(id, pages, categories, onSelect) {
+        const sorted = [...pages].sort((a, b) => b.sessions - a.sessions).slice(0, 50);
+        const treeData = sorted.map(p => ({
+            label: p.label,
+            sessions: p.sessions,
+            category: p.category,
+            path: p.path
+        }));
+
+        render(id, {
+            type: 'treemap',
+            data: {
+                datasets: [{
+                    tree: treeData,
+                    key: 'sessions',
+                    groups: ['category', 'label'],
+                    backgroundColor: (ctx) => {
+                        if (!ctx.raw || !ctx.raw._data) return '#e6e6e6';
+                        const cat = ctx.raw._data.category || ctx.raw._data.label;
+                        return (CAT_COLORS[cat] || COLORS.grey) + 'cc';
+                    },
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                    spacing: 1,
+                    labels: {
+                        display: true,
+                        align: 'center',
+                        position: 'middle',
+                        color: '#fff',
+                        font: { size: 10, weight: 'bold' },
+                        formatter: (ctx) => {
+                            if (!ctx.raw || !ctx.raw._data) return '';
+                            const label = ctx.raw._data.label || '';
+                            const s = ctx.raw._data.sessions;
+                            if (ctx.raw.w < 60 || ctx.raw.h < 25) return '';
+                            const sessStr = s >= 1000 ? Math.round(s / 1000) + 'k' : s;
+                            return label.length > 18 ? label.substring(0, 16) + '…' : label;
+                        }
+                    }
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => {
+                                const raw = items[0]?.raw;
+                                if (!raw?._data) return '';
+                                return raw._data.label || raw._data.category || '';
+                            },
+                            label: (ctx) => {
+                                if (!ctx.raw?._data) return '';
+                                return fmt(ctx.raw._data.sessions) + ' Sessions';
+                            }
+                        }
+                    }
+                },
+                onClick: (evt, elements) => {
+                    if (elements.length > 0 && onSelect) {
+                        const raw = elements[0].element?.$context?.raw;
+                        if (raw?._data?.path) onSelect(raw._data.path);
+                    }
+                }
+            }
+        });
+    }
+
+    // ── Tab: Übersicht / Traffic ──
     function trendLine(id, daily) {
         render(id, {
             type: 'line',
             data: {
-                labels: daily.map(d => {
-                    const p = d.date.split('-');
-                    return p[2] + '.' + p[1];
-                }),
+                labels: daily.map(d => { const p = d.date.split('-'); return p[2] + '.' + p[1]; }),
                 datasets: [
                     {
-                        label: 'Seitenaufrufe',
-                        data: daily.map(d => d.pv),
-                        borderColor: COLORS.primary,
-                        backgroundColor: 'rgba(0,198,178,0.08)',
-                        fill: true, tension: 0.3, pointRadius: 1.5,
-                        pointHoverRadius: 5, borderWidth: 2, yAxisID: 'y'
+                        label: 'Seitenaufrufe', data: daily.map(d => d.pv),
+                        borderColor: COLORS.primary, backgroundColor: 'rgba(0,198,178,0.08)',
+                        fill: true, tension: 0.3, pointRadius: 1.5, pointHoverRadius: 5, borderWidth: 2
                     },
                     {
-                        label: 'Sessions',
-                        data: daily.map(d => d.sessions),
-                        borderColor: COLORS.secondary,
-                        backgroundColor: 'transparent',
-                        fill: false, tension: 0.3, pointRadius: 1.5,
-                        pointHoverRadius: 5, borderWidth: 2,
-                        borderDash: [5, 3], yAxisID: 'y'
+                        label: 'Sessions', data: daily.map(d => d.sessions),
+                        borderColor: COLORS.secondary, backgroundColor: 'transparent',
+                        fill: false, tension: 0.3, pointRadius: 1.5, pointHoverRadius: 5, borderWidth: 2,
+                        borderDash: [5, 3]
                     }
                 ]
             },
@@ -144,27 +207,71 @@ const Charts = (() => {
         });
     }
 
+    // ── Traffic Tab: Metric-Switchable Trend ──
+    function trendLineMetric(id, daily, metric) {
+        const configs = {
+            'pv-sessions': {
+                datasets: [
+                    { label: 'Seitenaufrufe', data: daily.map(d => d.pv), borderColor: COLORS.primary, backgroundColor: 'rgba(0,198,178,0.08)', fill: true },
+                    { label: 'Sessions', data: daily.map(d => d.sessions), borderColor: COLORS.secondary, borderDash: [5, 3] }
+                ],
+                yFormat: v => fmt(v)
+            },
+            'bounce-engagement': {
+                datasets: [
+                    { label: 'Bounce Rate', data: daily.map(d => (d.bounceRate || 0) * 100), borderColor: COLORS.accent, backgroundColor: 'rgba(232,24,24,0.06)', fill: true },
+                    { label: 'Engagement Rate', data: daily.map(d => (d.engRate || 0) * 100), borderColor: COLORS.success, borderDash: [5, 3] }
+                ],
+                yFormat: v => v.toFixed(1) + '%'
+            },
+            'users': {
+                datasets: [
+                    { label: 'Nutzer', data: daily.map(d => d.users), borderColor: COLORS.secondary, backgroundColor: 'rgba(0,113,222,0.08)', fill: true },
+                    { label: 'Neue Nutzer', data: daily.map(d => d.newUsers || 0), borderColor: COLORS.highlight, borderDash: [5, 3] }
+                ],
+                yFormat: v => fmt(v)
+            }
+        };
+
+        const cfg = configs[metric] || configs['pv-sessions'];
+        const labels = daily.map(d => { const p = d.date.split('-'); return p[2] + '.' + p[1]; });
+
+        const datasets = cfg.datasets.map(ds => ({
+            ...ds,
+            tension: 0.3, pointRadius: 1.5, pointHoverRadius: 5, borderWidth: 2,
+            backgroundColor: ds.backgroundColor || 'transparent', fill: ds.fill || false
+        }));
+
+        render(id, {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { weight: 'bold' } } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { maxTicksLimit: 15 } },
+                    y: { beginAtZero: true, grid: { color: '#f2f0f0' }, ticks: { callback: cfg.yFormat } }
+                }
+            }
+        });
+    }
+
     // ── Tab: Quellen ──
     function sourcesDoughnut(id, sources) {
         const grouped = {};
-        sources.forEach(s => {
-            const ch = s.channel || 'Sonstige';
-            grouped[ch] = (grouped[ch] || 0) + s.sessions;
-        });
+        sources.forEach(s => { const ch = s.channel || 'Sonstige'; grouped[ch] = (grouped[ch] || 0) + s.sessions; });
         const labels = Object.keys(grouped);
         const data = Object.values(grouped);
 
         render(id, {
             type: 'doughnut',
-            data: {
-                labels,
-                datasets: [{ data, backgroundColor: PALETTE.slice(0, labels.length), borderWidth: 3, borderColor: '#fff' }]
-            },
+            data: { labels, datasets: [{ data, backgroundColor: PALETTE.slice(0, labels.length), borderWidth: 3, borderColor: '#fff' }] },
             options: {
                 responsive: true,
-                plugins: {
-                    legend: { position: 'right', labels: { boxWidth: 12, padding: 10, font: { size: 11 } } }
-                }
+                plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 10, font: { size: 11 } } } }
             }
         });
     }
@@ -185,27 +292,14 @@ const Charts = (() => {
 
         render(id, {
             type: 'bar',
-            data: {
-                labels,
-                datasets: [{ label: 'Sessions', data, backgroundColor: colors.slice(0, labels.length), borderRadius: 8 }]
-            },
+            data: { labels, datasets: [{ label: 'Sessions', data, backgroundColor: colors.slice(0, labels.length), borderRadius: 8 }] },
             options: {
                 responsive: true, indexAxis: 'y',
                 plugins: {
                     legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => {
-                                const total = data.reduce((a, b) => a + b, 0);
-                                return fmt(ctx.raw) + ' Sessions (' + Math.round(ctx.raw / total * 100) + '%)';
-                            }
-                        }
-                    }
+                    tooltip: { callbacks: { label: ctx => { const total = data.reduce((a, b) => a + b, 0); return fmt(ctx.raw) + ' Sessions (' + Math.round(ctx.raw / total * 100) + '%)'; } } }
                 },
-                scales: {
-                    x: { beginAtZero: true, grid: { color: '#f2f0f0' } },
-                    y: { grid: { display: false } }
-                }
+                scales: { x: { beginAtZero: true, grid: { color: '#f2f0f0' } }, y: { grid: { display: false } } }
             }
         });
     }
@@ -215,36 +309,18 @@ const Charts = (() => {
         const labels = devices.map(d => d.device + ' (' + Math.round(d.sessions / devices.reduce((a, b) => a + b.sessions, 0) * 100) + '%)');
         render(id, {
             type: 'doughnut',
-            data: {
-                labels,
-                datasets: [{ data: devices.map(d => d.sessions), backgroundColor: [COLORS.primary, COLORS.secondary, COLORS.highlight], borderWidth: 3, borderColor: '#fff' }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } }
-            }
+            data: { labels, datasets: [{ data: devices.map(d => d.sessions), backgroundColor: [COLORS.primary, COLORS.secondary, COLORS.highlight], borderWidth: 3, borderColor: '#fff' }] },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } } } }
         });
     }
 
     function deviceDuration(id, devices) {
         render(id, {
             type: 'bar',
-            data: {
-                labels: devices.map(d => d.device),
-                datasets: [{
-                    label: 'Ø Sitzungsdauer (Sek.)',
-                    data: devices.map(d => Math.round(d.avgDuration)),
-                    backgroundColor: [COLORS.primary, COLORS.secondary, COLORS.highlight],
-                    borderRadius: 8
-                }]
-            },
+            data: { labels: devices.map(d => d.device), datasets: [{ label: 'Ø Sitzungsdauer (Sek.)', data: devices.map(d => Math.round(d.avgDuration)), backgroundColor: [COLORS.primary, COLORS.secondary, COLORS.highlight], borderRadius: 8 }] },
             options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: '#f2f0f0' }, ticks: { callback: v => v + 's' } },
-                    x: { grid: { display: false } }
-                }
+                responsive: true, plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, grid: { color: '#f2f0f0' }, ticks: { callback: v => v + 's' } }, x: { grid: { display: false } } }
             }
         });
     }
@@ -253,48 +329,17 @@ const Charts = (() => {
         const top = cities.slice(0, 10);
         render(id, {
             type: 'bar',
-            data: {
-                labels: top.map(c => c.city),
-                datasets: [{
-                    label: 'Sessions',
-                    data: top.map(c => c.sessions),
-                    backgroundColor: COLORS.primary,
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: '#f2f0f0' } },
-                    x: { grid: { display: false } }
-                }
-            }
+            data: { labels: top.map(c => c.city), datasets: [{ label: 'Sessions', data: top.map(c => c.sessions), backgroundColor: COLORS.primary, borderRadius: 6 }] },
+            options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f2f0f0' } }, x: { grid: { display: false } } } }
         });
     }
 
-    // ── Tab: Events ──
     function eventsBar(id, events) {
         const all = events.slice(0, 8);
         render(id, {
             type: 'bar',
-            data: {
-                labels: all.map(e => e.name),
-                datasets: [{
-                    label: 'Anzahl',
-                    data: all.map(e => e.count),
-                    backgroundColor: PALETTE.slice(0, all.length),
-                    borderRadius: 8
-                }]
-            },
-            options: {
-                responsive: true, indexAxis: 'y',
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { beginAtZero: true, grid: { color: '#f2f0f0' } },
-                    y: { grid: { display: false } }
-                }
-            }
+            data: { labels: all.map(e => e.name), datasets: [{ label: 'Anzahl', data: all.map(e => e.count), backgroundColor: PALETTE.slice(0, all.length), borderRadius: 8 }] },
+            options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: '#f2f0f0' } }, y: { grid: { display: false } } } }
         });
     }
 
@@ -302,32 +347,11 @@ const Charts = (() => {
     function funnelBar(id, funnel) {
         render(id, {
             type: 'bar',
-            data: {
-                labels: funnel.map(f => f.step),
-                datasets: [{
-                    label: 'Nutzer',
-                    data: funnel.map(f => f.count),
-                    backgroundColor: PALETTE.slice(0, funnel.length),
-                    borderRadius: 8
-                }]
-            },
+            data: { labels: funnel.map(f => f.step), datasets: [{ label: 'Nutzer', data: funnel.map(f => f.count), backgroundColor: PALETTE.slice(0, funnel.length), borderRadius: 8 }] },
             options: {
                 responsive: true, indexAxis: 'y',
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => {
-                                const total = funnel[0]?.count || 1;
-                                return fmt(ctx.raw) + ' (' + Math.round(ctx.raw / total * 100 * 10) / 10 + '%)';
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: { beginAtZero: true, grid: { color: '#f2f0f0' } },
-                    y: { grid: { display: false } }
-                }
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => { const total = funnel[0]?.count || 1; return fmt(ctx.raw) + ' (' + (ctx.raw / total * 100).toFixed(1) + '%)'; } } } },
+                scales: { x: { beginAtZero: true, grid: { color: '#f2f0f0' } }, y: { grid: { display: false } } }
             }
         });
     }
@@ -337,31 +361,124 @@ const Charts = (() => {
         if (top.length === 0) return;
         render(id, {
             type: 'bar',
+            data: { labels: top.map(p => shortenPath(p.page)), datasets: [{ label: 'Conversions', data: top.map(p => p.conversions), backgroundColor: COLORS.accent, borderRadius: 8 }] },
+            options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: '#f2f0f0' }, ticks: { stepSize: 1 } }, y: { grid: { display: false } } } }
+        });
+    }
+
+    // ── Conversion Rate by Source ──
+    function convBySource(id, sources) {
+        const buckets = {};
+        sources.forEach(s => {
+            const ch = s.channel || 'Sonstige';
+            if (!buckets[ch]) buckets[ch] = { sessions: 0, conversions: 0 };
+            buckets[ch].sessions += s.sessions;
+            buckets[ch].conversions += (s.conversions || 0);
+        });
+        const entries = Object.entries(buckets)
+            .map(([ch, d]) => ({ channel: ch, rate: d.sessions > 0 ? (d.conversions / d.sessions * 100) : 0, sessions: d.sessions, conversions: d.conversions }))
+            .filter(e => e.sessions > 50)
+            .sort((a, b) => b.rate - a.rate);
+
+        if (entries.length === 0) return;
+
+        render(id, {
+            type: 'bar',
             data: {
-                labels: top.map(p => p.page.replace(/^\/de\//, '/').replace(/\.html$/, '').split('/').pop() || p.page),
-                datasets: [{
-                    label: 'Conversions',
-                    data: top.map(p => p.conversions),
-                    backgroundColor: COLORS.accent,
-                    borderRadius: 8
-                }]
+                labels: entries.map(e => e.channel),
+                datasets: [
+                    { label: 'Conv. Rate (%)', data: entries.map(e => e.rate), backgroundColor: COLORS.primary, borderRadius: 8, yAxisID: 'y' },
+                    { label: 'Sessions', data: entries.map(e => e.sessions), backgroundColor: COLORS.grey + '44', borderRadius: 8, yAxisID: 'y2' }
+                ]
             },
             options: {
-                responsive: true, indexAxis: 'y',
-                plugins: { legend: { display: false } },
+                responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { weight: 'bold' } } },
+                    tooltip: { callbacks: { label: ctx => ctx.dataset.label === 'Conv. Rate (%)' ? ctx.raw.toFixed(2) + '%' : fmt(ctx.raw) + ' Sessions' } }
+                },
                 scales: {
-                    x: { beginAtZero: true, grid: { color: '#f2f0f0' }, ticks: { stepSize: 1 } },
-                    y: { grid: { display: false } }
+                    y: { grid: { display: false } },
+                    x: { beginAtZero: true, grid: { color: '#f2f0f0' }, ticks: { callback: v => v.toFixed(1) + '%' } },
+                    y2: { display: false }
                 }
             }
         });
     }
 
+    // ── Sankey Diagram ──
+    function sankeyChart(id, followUpPages, currentPageLabel) {
+        if (!followUpPages || followUpPages.length === 0) return;
+
+        const top = [...followUpPages].sort((a, b) => b.users - a.users).slice(0, 12);
+        const fromLabel = currentPageLabel || 'Landing Page';
+
+        const data = top.map(p => ({
+            from: fromLabel,
+            to: shortenPath(p.page) || p.page,
+            flow: p.users
+        }));
+
+        // Color coding: green for pages with conversions, primary for others
+        const convPages = new Set(top.filter(p => p.conversions > 0).map(p => shortenPath(p.page) || p.page));
+
+        const labels = {};
+        labels[fromLabel] = fromLabel;
+        top.forEach(p => {
+            const short = shortenPath(p.page) || p.page;
+            labels[short] = short;
+        });
+
+        render(id, {
+            type: 'sankey',
+            data: {
+                datasets: [{
+                    label: 'Nutzer-Pfade',
+                    data: data,
+                    colorFrom: COLORS.primary,
+                    colorTo: (ctx) => {
+                        const to = ctx.raw?.to || '';
+                        return convPages.has(to) ? COLORS.success : COLORS.secondary;
+                    },
+                    colorMode: 'gradient',
+                    labels: labels,
+                    size: 'max',
+                    nodeWidth: 14,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const d = ctx.raw;
+                                if (!d) return '';
+                                const convInfo = top.find(p => (shortenPath(p.page) || p.page) === d.to);
+                                let label = d.from + ' → ' + d.to + ': ' + fmt(d.flow) + ' Nutzer';
+                                if (convInfo?.conversions > 0) label += ' (' + convInfo.conversions + ' Conv.)';
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // ── Export helpers ──
+    function getChartImage(id) {
+        return instances[id]?.toBase64Image() || null;
+    }
+
     return {
-        trendLine, sourcesDoughnut, paidVsOrganic,
+        trendLine, trendLineMetric, sourcesDoughnut, paidVsOrganic,
         deviceDoughnut, deviceDuration, citiesBar,
         eventsBar, funnelBar, conversionPagesBar,
-        categoryDonut, trafficBars,
+        categoryDonut, trafficBars, trafficTreemap,
+        convBySource, sankeyChart, getChartImage,
         PALETTE, COLORS, CAT_COLORS
     };
 })();

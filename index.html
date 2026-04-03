@@ -6,6 +6,8 @@
     <title>FOM Web-Analyse Dashboard</title>
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0.12.1/dist/chartjs-chart-sankey.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.1/dist/chartjs-chart-treemap.min.js"></script>
 </head>
 <body>
 
@@ -146,7 +148,13 @@
                     </div>
                     <div class="chart-card">
                         <h3>Verteilung nach Kategorie</h3>
-                        <canvas id="chart-category-donut"></canvas>
+                        <canvas id="chart-category-donut" style="max-height:220px"></canvas>
+                        <div style="margin-top:14px">
+                            <h3>Treemap – alle Seiten</h3>
+                            <div style="height:220px">
+                                <canvas id="chart-treemap"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -162,8 +170,15 @@
         <div class="tab-content" id="tab-traffic">
             <div class="section">
                 <div class="section-title">Traffic-Verlauf im Detail</div>
-                <div class="chart-card chart-card-full" style="height:350px">
-                    <canvas id="chart-traffic-trend"></canvas>
+                <div class="chart-card chart-card-full">
+                    <div class="metric-toggles">
+                        <button class="metric-btn active" data-metric="pv-sessions">Seitenaufrufe & Sessions</button>
+                        <button class="metric-btn" data-metric="bounce-engagement">Bounce & Engagement Rate</button>
+                        <button class="metric-btn" data-metric="users">Nutzer & neue Nutzer</button>
+                    </div>
+                    <div style="height:320px">
+                        <canvas id="chart-traffic-trend"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -232,6 +247,12 @@
                 </div>
             </div>
             <div class="section">
+                <div class="section-title">Conversion-Rate nach Quelle</div>
+                <div class="chart-card chart-card-full" style="height:280px">
+                    <canvas id="chart-conv-by-source"></canvas>
+                </div>
+            </div>
+            <div class="section">
                 <div class="section-title">Folgeseiten mit Conversion-Rate</div>
                 <div class="chart-card" id="table-followup">
                     <div class="empty-state">Keine Conversion-Daten verfügbar</div>
@@ -242,7 +263,13 @@
         <!-- Tab: Pfade -->
         <div class="tab-content" id="tab-paths">
             <div class="section">
-                <div class="section-title">Nutzer-Pfade & Navigation</div>
+                <div class="section-title">Nutzer-Pfade (Sankey-Diagramm)</div>
+                <div class="chart-card chart-card-full" style="height:450px">
+                    <canvas id="chart-sankey"></canvas>
+                </div>
+            </div>
+            <div class="section">
+                <div class="section-title">Pfade im Detail</div>
                 <div id="flow-container">
                     <div class="empty-state">Keine Pfad-Daten verfügbar</div>
                 </div>

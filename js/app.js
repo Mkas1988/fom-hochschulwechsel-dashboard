@@ -7,7 +7,8 @@ const App = (() => {
         dateStart: '',
         dateEnd: '',
         activeTab: 'overview',
-        selectedConversions: new Set()
+        selectedConversions: new Set(),
+        trafficMetric: 'pv-sessions'
     };
 
     // ── Conversion definitions ──
@@ -59,6 +60,7 @@ const App = (() => {
         setupTabs();
         setupPresets();
         setupConversionFilter();
+        setupMetricToggle();
     }
 
     // ── Login ──
@@ -277,6 +279,18 @@ const App = (() => {
         return chip;
     }
 
+    // ── Metric Toggle (Traffic Tab) ──
+    function setupMetricToggle() {
+        document.querySelectorAll('.metric-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.trafficMetric = btn.dataset.metric;
+                if (state.activeTab === 'traffic') renderTab('traffic');
+            });
+        });
+    }
+
     // ── Datepicker ──
     function setupDatepicker() {
         const startEl = document.getElementById('date-start');
@@ -479,10 +493,11 @@ const App = (() => {
                 const distPages = getTrafficDistPages();
                 Charts.trafficBars('traffic-bars', distPages, INDEX.categories, selectPage);
                 Charts.categoryDonut('chart-category-donut', distPages, INDEX.categories);
+                Charts.trafficTreemap('chart-treemap', distPages, INDEX.categories, selectPage);
                 if (page) Charts.trendLine('chart-trend', daily);
                 break;
             case 'traffic':
-                if (page) Charts.trendLine('chart-traffic-trend', daily);
+                if (page) Charts.trendLineMetric('chart-traffic-trend', daily, state.trafficMetric);
                 break;
             case 'sources':
                 if (page?.sources?.length) {
@@ -509,6 +524,7 @@ const App = (() => {
                         if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0, 0, el.width, el.height); }
                     }
                 }
+                if (page?.sources?.length) Charts.convBySource('chart-conv-by-source', page.sources);
                 if (page?.conversions?.followUpPages?.length) {
                     Charts.conversionPagesBar('chart-conv-pages', page.conversions.followUpPages);
                     Tables.followUpTable('table-followup', page.conversions.followUpPages);
@@ -516,6 +532,8 @@ const App = (() => {
                 break;
             case 'paths':
                 if (page?.conversions?.followUpPages?.length) {
+                    const indexPage = getIndexPage();
+                    Charts.sankeyChart('chart-sankey', page.conversions.followUpPages, indexPage?.label || page.path);
                     Tables.flowTable('flow-container', page.conversions.followUpPages);
                 }
                 break;

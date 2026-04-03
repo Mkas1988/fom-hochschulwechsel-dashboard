@@ -272,6 +272,75 @@ body {
     font-weight: 400;
 }
 
+/* ── Metric Toggles ── */
+.metric-toggles {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.metric-btn {
+    padding: 5px 12px;
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    background: white;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease-in;
+}
+
+.metric-btn:hover { border-color: var(--primary); color: var(--primary-dark); }
+.metric-btn.active { background: var(--primary); border-color: var(--primary); color: white; }
+
+/* ── Export Buttons ── */
+.export-bar {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.export-btn {
+    padding: 5px 12px;
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    background: white;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease-in;
+}
+
+.export-btn:hover { border-color: var(--secondary); color: var(--secondary); }
+
+/* ── Animations ── */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.kpi-card { animation: fadeIn 0.3s ease-out; }
+.kpi-card:nth-child(2) { animation-delay: 0.05s; }
+.kpi-card:nth-child(3) { animation-delay: 0.1s; }
+.kpi-card:nth-child(4) { animation-delay: 0.15s; }
+.kpi-card:nth-child(5) { animation-delay: 0.2s; }
+.kpi-card:nth-child(6) { animation-delay: 0.25s; }
+.kpi-card:nth-child(7) { animation-delay: 0.3s; }
+.kpi-card:nth-child(8) { animation-delay: 0.35s; }
+
+.chart-card { animation: fadeIn 0.4s ease-out; }
+.tab-content.active { animation: fadeIn 0.25s ease-out; }
+
+/* ── Sort Headers ── */
+.data-table th .sort-icon { margin-left: 4px; opacity: 0.5; font-size: 0.7rem; }
+.data-table th.sorted .sort-icon { opacity: 1; }
+.data-table th.sorted-asc .sort-icon::after { content: '▲'; }
+.data-table th.sorted-desc .sort-icon::after { content: '▼'; }
+
 /* ── Tab Bar ── */
 .tab-bar {
     background: white;
