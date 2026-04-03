@@ -36,8 +36,12 @@
     <!-- Controls -->
     <div class="controls">
         <div class="control-group">
-            <label>Seite</label>
+            <label>Bereich</label>
             <select id="page-select"></select>
+        </div>
+        <div class="control-group" id="sub-select-group" style="display:none">
+            <label>Studiengang</label>
+            <select id="sub-select"></select>
         </div>
         <div class="control-group">
             <label>Von</label>
@@ -52,6 +56,20 @@
             <button class="btn btn-preset" data-days="7">7 Tage</button>
             <button class="btn btn-preset" data-days="30">30 Tage</button>
             <button class="btn btn-preset active" data-days="0">Gesamt</button>
+        </div>
+    </div>
+
+    <!-- Conversion Filter -->
+    <div class="conv-filter-bar" id="conv-filter-bar">
+        <div class="conv-filter-label">Conversions:</div>
+        <div class="conv-filter-group">
+            <span class="conv-group-title">Key</span>
+            <div class="conv-chips" id="conv-chips-key"></div>
+        </div>
+        <div class="conv-filter-sep"></div>
+        <div class="conv-filter-group">
+            <span class="conv-group-title">Allgemein</span>
+            <div class="conv-chips" id="conv-chips-general"></div>
         </div>
     </div>
 

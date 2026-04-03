@@ -1,25 +1,17 @@
 // ── FOM Web-Analyse App ──
 const App = (() => {
-    let DATA = null;       // detailed data (data.json)
-    let INDEX = null;      // all pages index (pages-index.json)
+    let DATA = null;
+    let INDEX = null;
     let state = {
         pagePath: '',
         dateStart: '',
         dateEnd: '',
-        activeTab: 'overview'
+        activeTab: 'overview',
+        selectedConversions: new Set()
     };
 
-    // Key conversion funnel steps (filter out irrelevant ones)
-    const KEY_CONV_STEPS = [
-        'Sessions', 'Conversions',
-        'thank-you-page-anmeldung', 'thank-you-page-infomaterial',
-        'thank-you-page-dualmatch', 'anmeldung',
-        'studienberatung', 'studienberatung-oa'
-    ];
-
-    const KEY_CONV_LABELS = {
-        'Sessions': 'Sessions',
-        'Conversions': 'Gesamt-Conversions',
+    // ── Conversion definitions ──
+    const KEY_CONVERSIONS = {
         'thank-you-page-anmeldung': 'Online-Anmeldung',
         'thank-you-page-infomaterial': 'Infomaterial-Bestellung',
         'thank-you-page-dualmatch': 'DualMatch-Anfrage',
@@ -28,6 +20,29 @@ const App = (() => {
         'studienberatung-oa': 'Studienberatung (Online)'
     };
 
+    const GENERAL_CONVERSIONS = {
+        'Sessions gesamt': 'Sessions',
+        'Conversions': 'Gesamt-Conversions',
+        'bachelor': 'Bachelor-Seiten',
+        'master': 'Master-Seiten',
+        'dual': 'Dual-Seiten',
+        'studiengangsfinder': 'Studiengangsfinder',
+        'sofortcheck': 'Sofortcheck',
+        'kontakt': 'Kontakt',
+        '/info-material/': 'Infomaterial-Seite',
+        '/': 'Startseite',
+        'de': 'DE-Seite',
+        'last-call-bachelor': 'Last Call Bachelor',
+        'last-call-bachelor-dual': 'Last Call Dual',
+        'international-master': 'Internat. Master',
+        '120-ects-master': '120-ECTS Master',
+        '90-ects-master': '90-ECTS Master',
+        '60-ects-master': '60-ECTS Master',
+        'business-administration-ba': 'Business Admin. (BA)'
+    };
+
+    const ALL_CONV_LABELS = { ...KEY_CONVERSIONS, ...GENERAL_CONVERSIONS };
+
     // ── Init ──
     function init(detailedData, pageIndex) {
         DATA = detailedData;
@@ -35,11 +50,15 @@ const App = (() => {
         state.dateStart = DATA.dateRange.start;
         state.dateEnd = DATA.dateRange.end;
 
+        // Default: all key conversions selected
+        Object.keys(KEY_CONVERSIONS).forEach(k => state.selectedConversions.add(k));
+
         setupLogin();
         populateDropdown();
         setupDatepicker();
         setupTabs();
         setupPresets();
+        setupConversionFilter();
     }
 
     // ── Login ──
@@ -63,61 +82,199 @@ const App = (() => {
         input.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
     }
 
-    // ── Dropdown with optgroups ──
-    function populateDropdown() {
-        const sel = document.getElementById('page-select');
-        const categories = INDEX.categories;
-        const pages = INDEX.pages;
+    // ── Categories that have sub-dropdowns ──
+    const SUB_CATEGORIES = ['Bachelor', 'Master'];
 
-        // Group pages by category
-        const groups = {};
-        categories.forEach(cat => groups[cat] = []);
-        pages.forEach(p => {
-            if (groups[p.category]) groups[p.category].push(p);
+    function getMainPages() {
+        const pages = INDEX.pages;
+        const mainPages = [];
+
+        INDEX.categories.forEach(cat => {
+            const catPages = pages.filter(p => p.category === cat);
+            if (catPages.length === 0) return;
+
+            if (SUB_CATEGORIES.includes(cat)) {
+                const overviews = catPages.filter(p =>
+                    p.path.includes('bachelor.html') || p.path.includes('master.html') ||
+                    p.label.toLowerCase().includes('alle ') || p.label.toLowerCase().includes('übersicht')
+                );
+                (overviews.length > 0 ? overviews : [catPages[0]]).forEach(p => mainPages.push({ ...p, _cat: cat }));
+            } else {
+                catPages.forEach(p => mainPages.push({ ...p, _cat: cat }));
+            }
         });
 
-        // Build optgroups
-        categories.forEach(cat => {
+        return mainPages;
+    }
+
+    function getSubPages(category) {
+        return INDEX.pages
+            .filter(p => p.category === category)
+            .filter(p => {
+                const l = p.label.toLowerCase();
+                return !l.includes('alle ') && !l.includes('übersicht');
+            })
+            .sort((a, b) => b.sessions - a.sessions);
+    }
+
+    function populateDropdown() {
+        const sel = document.getElementById('page-select');
+        const subSel = document.getElementById('sub-select');
+        const mainPages = getMainPages();
+
+        const groups = {};
+        INDEX.categories.forEach(cat => groups[cat] = []);
+        mainPages.forEach(p => { if (groups[p._cat]) groups[p._cat].push(p); });
+
+        INDEX.categories.forEach(cat => {
             const items = groups[cat];
             if (!items || items.length === 0) return;
-
             const optgroup = document.createElement('optgroup');
-            optgroup.label = cat + ' (' + items.length + ')';
-
+            optgroup.label = cat;
             items.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p.path;
+                opt.dataset.category = p._cat;
                 const sessions = p.sessions >= 1000 ? Math.round(p.sessions / 1000) + 'k' : p.sessions;
                 opt.textContent = p.label + '  ·  ' + sessions + ' Sessions';
-                // Mark pages with detailed data
-                const hasDetail = DATA.pages.some(dp => dp.path === p.path);
-                if (!hasDetail) opt.style.color = '#9a9a9a';
-                sel.appendChild(opt);
+                if (!DATA.pages.some(dp => dp.path === p.path)) opt.style.color = '#9a9a9a';
+                optgroup.appendChild(opt);
             });
-
             sel.appendChild(optgroup);
         });
 
-        // Select first page
         if (DATA.pages.length > 0) {
             state.pagePath = DATA.pages[0].path;
             sel.value = state.pagePath;
         }
 
         sel.addEventListener('change', () => {
+            const opt = sel.options[sel.selectedIndex];
             state.pagePath = sel.value;
+            updateSubDropdown(opt?.dataset?.category);
             renderAll();
+        });
+
+        subSel.addEventListener('change', () => {
+            if (subSel.value) {
+                state.pagePath = subSel.value;
+                renderAll();
+            }
+        });
+
+        const initOpt = sel.options[sel.selectedIndex];
+        updateSubDropdown(initOpt?.dataset?.category);
+    }
+
+    function updateSubDropdown(category) {
+        const subSel = document.getElementById('sub-select');
+        const subGroup = document.getElementById('sub-select-group');
+
+        if (!category || !SUB_CATEGORIES.includes(category)) {
+            subGroup.style.display = 'none';
+            return;
+        }
+
+        const subPages = getSubPages(category);
+        if (subPages.length === 0) { subGroup.style.display = 'none'; return; }
+
+        subSel.innerHTML = '';
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = '– ' + category + '-Studiengang wählen –';
+        subSel.appendChild(defaultOpt);
+
+        subPages.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.path;
+            const sessions = p.sessions >= 1000 ? Math.round(p.sessions / 1000) + 'k' : p.sessions;
+            opt.textContent = p.label + '  ·  ' + sessions + ' Sessions';
+            if (!DATA.pages.some(dp => dp.path === p.path)) opt.style.color = '#9a9a9a';
+            subSel.appendChild(opt);
+        });
+
+        subGroup.style.display = 'flex';
+        subSel.value = '';
+    }
+
+    function selectPage(path) {
+        const sel = document.getElementById('page-select');
+        const subSel = document.getElementById('sub-select');
+
+        // Check if path is in main dropdown
+        const mainOpt = Array.from(sel.options).find(o => o.value === path);
+        if (mainOpt) {
+            state.pagePath = path;
+            sel.value = path;
+            updateSubDropdown(mainOpt.dataset?.category);
+        } else {
+            // Try sub-dropdown: find which category this page belongs to
+            const indexPage = INDEX.pages.find(p => p.path === path);
+            if (indexPage && SUB_CATEGORIES.includes(indexPage.category)) {
+                // Select the overview page in main dropdown first
+                const overviewOpt = Array.from(sel.options).find(o => o.dataset?.category === indexPage.category);
+                if (overviewOpt) {
+                    sel.value = overviewOpt.value;
+                    updateSubDropdown(indexPage.category);
+                    subSel.value = path;
+                }
+            }
+            state.pagePath = path;
+        }
+
+        renderAll();
+        document.querySelector('.kpi-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ── Conversion Filter ──
+    function setupConversionFilter() {
+        const keyContainer = document.getElementById('conv-chips-key');
+        const generalContainer = document.getElementById('conv-chips-general');
+
+        // Get available steps from current data
+        const availableSteps = new Set();
+        DATA.pages.forEach(p => {
+            if (p.conversions?.funnel) {
+                p.conversions.funnel.forEach(f => availableSteps.add(f.step));
+            }
+        });
+
+        // Build key conversion chips
+        Object.entries(KEY_CONVERSIONS).forEach(([step, label]) => {
+            if (!availableSteps.has(step)) return;
+            const chip = createChip(step, label, true);
+            keyContainer.appendChild(chip);
+        });
+
+        // Build general conversion chips
+        Object.entries(GENERAL_CONVERSIONS).forEach(([step, label]) => {
+            if (!availableSteps.has(step)) return;
+            const chip = createChip(step, label, false);
+            generalContainer.appendChild(chip);
         });
     }
 
-    // ── Select page from traffic bars ──
-    function selectPage(path) {
-        const sel = document.getElementById('page-select');
-        state.pagePath = path;
-        sel.value = path;
-        renderAll();
-        // Scroll to KPIs
-        document.querySelector('.kpi-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    function createChip(step, label, isKey) {
+        const chip = document.createElement('span');
+        chip.className = 'conv-chip' + (isKey ? ' key-chip' : '') + (state.selectedConversions.has(step) ? ' active' : '');
+        chip.dataset.step = step;
+        chip.textContent = label;
+
+        chip.addEventListener('click', () => {
+            if (state.selectedConversions.has(step)) {
+                state.selectedConversions.delete(step);
+                chip.classList.remove('active');
+            } else {
+                state.selectedConversions.add(step);
+                chip.classList.add('active');
+            }
+            // Re-render conversions tab if active
+            if (state.activeTab === 'conversions') {
+                renderTab('conversions');
+            }
+        });
+
+        return chip;
     }
 
     // ── Datepicker ──
@@ -141,7 +298,6 @@ const App = (() => {
         });
     }
 
-    // ── Presets ──
     function setupPresets() {
         document.querySelectorAll('.btn-preset').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -189,13 +345,8 @@ const App = (() => {
     }
 
     // ── Get current page data ──
-    function getDetailedPage() {
-        return DATA.pages.find(p => p.path === state.pagePath);
-    }
-
-    function getIndexPage() {
-        return INDEX.pages.find(p => p.path === state.pagePath);
-    }
+    function getDetailedPage() { return DATA.pages.find(p => p.path === state.pagePath); }
+    function getIndexPage() { return INDEX.pages.find(p => p.path === state.pagePath); }
 
     function getFilteredDaily() {
         const page = getDetailedPage();
@@ -208,33 +359,31 @@ const App = (() => {
         const sum = (arr, key) => arr.reduce((a, d) => a + (d[key] || 0), 0);
         const avg = (arr, key) => arr.length ? arr.reduce((a, d) => a + (d[key] || 0), 0) / arr.length : 0;
         return {
-            pv: sum(daily, 'pv'),
-            sessions: sum(daily, 'sessions'),
-            users: sum(daily, 'users'),
-            newUsers: sum(daily, 'newUsers'),
-            engRate: avg(daily, 'engRate'),
-            bounceRate: avg(daily, 'bounceRate'),
-            avgDuration: avg(daily, 'avgDuration'),
-            conversions: sum(daily, 'conversions')
+            pv: sum(daily, 'pv'), sessions: sum(daily, 'sessions'),
+            users: sum(daily, 'users'), newUsers: sum(daily, 'newUsers'),
+            engRate: avg(daily, 'engRate'), bounceRate: avg(daily, 'bounceRate'),
+            avgDuration: avg(daily, 'avgDuration'), conversions: sum(daily, 'conversions')
         };
     }
 
-    // ── Filter conversions to key events only ──
-    function filterKeyConversions(funnel) {
+    // ── Filter conversions based on selected chips ──
+    function filterConversionFunnel(funnel) {
         if (!funnel) return [];
+        const selected = state.selectedConversions;
+        if (selected.size === 0) return []; // nothing selected
+
         return funnel
-            .filter(f => KEY_CONV_STEPS.includes(f.step))
+            .filter(f => selected.has(f.step))
             .map(f => ({
-                step: KEY_CONV_LABELS[f.step] || f.step,
+                step: ALL_CONV_LABELS[f.step] || f.step,
                 count: f.count
             }));
     }
 
-    // ── Build traffic distribution data respecting date filter ──
+    // ── Traffic distribution with date filter ──
     function getTrafficDistPages() {
         const isFullRange = state.dateStart === DATA.dateRange.start && state.dateEnd === DATA.dateRange.end;
 
-        // For pages with detailed daily data: calculate filtered sessions
         const detailedPages = DATA.pages.map(dp => {
             const daily = dp.daily ? dp.daily.filter(d => d.date >= state.dateStart && d.date <= state.dateEnd) : [];
             const sessions = daily.reduce((sum, d) => sum + (d.sessions || 0), 0);
@@ -248,12 +397,10 @@ const App = (() => {
         });
 
         if (isFullRange) {
-            // Full range: show all pages from INDEX, but use detailed sessions where available
             const detailedPaths = new Set(detailedPages.map(p => p.path));
             const otherPages = INDEX.pages.filter(p => !detailedPaths.has(p.path));
             return [...detailedPages, ...otherPages].sort((a, b) => b.sessions - a.sessions);
         } else {
-            // Filtered range: only show pages with daily data (accurate numbers)
             return detailedPages.sort((a, b) => b.sessions - a.sessions);
         }
     }
@@ -265,24 +412,17 @@ const App = (() => {
         const noDataBanner = document.getElementById('no-data-banner');
 
         if (!detailed && indexPage) {
-            // Show basic info from index
             if (noDataBanner) {
                 noDataBanner.style.display = 'block';
                 noDataBanner.querySelector('.page-name').textContent = indexPage.label;
                 noDataBanner.querySelector('.page-sessions').textContent = fmtNum(indexPage.sessions);
             }
-            setText('kpi-pv', '–');
-            setText('kpi-pv-sub', '');
-            setText('kpi-sessions', fmtNum(indexPage.sessions));
-            setText('kpi-sessions-sub', 'Gesamtzeitraum');
-            setText('kpi-users', '–');
-            setText('kpi-users-sub', '');
-            setText('kpi-engagement', '–');
-            setText('kpi-bounce', '–');
-            setText('kpi-duration', '–');
-            setText('kpi-pages', '–');
-            setText('kpi-conversions', '–');
-            setText('kpi-conversions-sub', '');
+            setText('kpi-pv', '–'); setText('kpi-pv-sub', '');
+            setText('kpi-sessions', fmtNum(indexPage.sessions)); setText('kpi-sessions-sub', 'Gesamtzeitraum');
+            setText('kpi-users', '–'); setText('kpi-users-sub', '');
+            setText('kpi-engagement', '–'); setText('kpi-bounce', '–');
+            setText('kpi-duration', '–'); setText('kpi-pages', '–');
+            setText('kpi-conversions', '–'); setText('kpi-conversions-sub', '');
             clearCharts();
         } else {
             if (noDataBanner) noDataBanner.style.display = 'none';
@@ -292,19 +432,15 @@ const App = (() => {
     }
 
     function clearCharts() {
-        // Clear all chart canvases and tables
         ['chart-trend','chart-traffic-trend','chart-sources-donut','chart-paid-organic',
          'chart-device-donut','chart-device-duration','chart-cities','chart-events',
          'chart-funnel','chart-conv-pages'].forEach(id => {
             const el = document.getElementById(id);
-            if (el) {
-                const ctx = el.getContext('2d');
-                ctx.clearRect(0, 0, el.width, el.height);
-            }
+            if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0, 0, el.width, el.height); }
         });
         ['table-sources','table-followup','flow-container'].forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = '<div class="empty-state">Detaildaten für diese Seite nicht verfügbar. Nur Sessions-Gesamtzahl aus GA4 vorhanden.</div>';
+            if (el) el.innerHTML = '<div class="empty-state">Detaildaten nicht verfügbar.</div>';
         });
     }
 
@@ -340,7 +476,6 @@ const App = (() => {
 
         switch (tab) {
             case 'overview':
-                // Traffic distribution with date-filtered sessions
                 const distPages = getTrafficDistPages();
                 Charts.trafficBars('traffic-bars', distPages, INDEX.categories, selectPage);
                 Charts.categoryDonut('chart-category-donut', distPages, INDEX.categories);
@@ -366,8 +501,13 @@ const App = (() => {
                 break;
             case 'conversions':
                 if (page?.conversions?.funnel?.length) {
-                    const filtered = filterKeyConversions(page.conversions.funnel);
-                    if (filtered.length > 0) Charts.funnelBar('chart-funnel', filtered);
+                    const filtered = filterConversionFunnel(page.conversions.funnel);
+                    if (filtered.length > 0) {
+                        Charts.funnelBar('chart-funnel', filtered);
+                    } else {
+                        const el = document.getElementById('chart-funnel');
+                        if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0, 0, el.width, el.height); }
+                    }
                 }
                 if (page?.conversions?.followUpPages?.length) {
                     Charts.conversionPagesBar('chart-conv-pages', page.conversions.followUpPages);
@@ -382,7 +522,6 @@ const App = (() => {
         }
     }
 
-    // ── Helpers ──
     function setText(id, text) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;

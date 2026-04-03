@@ -183,6 +183,95 @@ body {
 
 .presets { display: flex; gap: 6px; margin-left: auto; }
 
+/* ── Conversion Filter Bar ── */
+.conv-filter-bar {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+}
+
+.conv-filter-label {
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.conv-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.conv-group-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-right: 2px;
+    white-space: nowrap;
+}
+
+.conv-filter-sep {
+    width: 1px;
+    height: 24px;
+    background: var(--grey-200);
+    margin: 0 4px;
+}
+
+.conv-chips {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.conv-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease-in;
+    border: 2px solid var(--border);
+    background: white;
+    color: var(--text-muted);
+    user-select: none;
+    white-space: nowrap;
+}
+
+.conv-chip:hover {
+    border-color: var(--primary);
+    color: var(--primary-dark);
+}
+
+.conv-chip.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.conv-chip.active.key-chip {
+    background: var(--secondary);
+    border-color: var(--secondary);
+}
+
+.conv-chip .chip-count {
+    margin-left: 5px;
+    opacity: 0.7;
+    font-weight: 400;
+}
+
 /* ── Tab Bar ── */
 .tab-bar {
     background: white;
@@ -507,6 +596,9 @@ body {
     .presets { margin-left: 0; flex-wrap: wrap; }
     .container { padding: 16px; }
     .tab-bar { padding: 0 16px; }
+    .conv-filter-bar { padding: 10px 16px; }
+    .conv-filter-sep { display: none; }
+    .conv-filter-bar { flex-direction: column; align-items: flex-start; }
     .chart-grid { grid-template-columns: 1fr; }
     .kpi-grid { grid-template-columns: repeat(2, 1fr); }
     .traffic-bar-label { width: 120px; min-width: 120px; }
