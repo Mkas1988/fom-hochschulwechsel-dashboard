@@ -130,24 +130,28 @@ const App = (() => {
     }
 
     // ── Page Dropdowns ──
-    const SUB_CATEGORIES = ['Bachelor', 'Master'];
+    // Categories that get a sub-dropdown for individual pages
+    const SUB_CATEGORIES = ['Bachelor', 'Master', 'Standorte', 'Beratung & Service', 'Hochschulbereiche'];
+    // Max pages to show in main dropdown per category (for non-sub categories)
+    const MAX_MAIN_PAGES = 8;
 
     function getMainPages() {
         const pages = INDEX.pages;
         const mainPages = [];
 
         INDEX.categories.forEach(cat => {
-            const catPages = pages.filter(p => p.category === cat);
+            const catPages = pages.filter(p => p.category === cat).sort((a, b) => b.sessions - a.sessions);
             if (catPages.length === 0) return;
 
             if (SUB_CATEGORIES.includes(cat)) {
-                const overviews = catPages.filter(p =>
-                    p.path.includes('bachelor.html') || p.path.includes('master.html') ||
-                    p.label.toLowerCase().includes('alle ') || p.label.toLowerCase().includes('übersicht')
-                );
-                (overviews.length > 0 ? overviews : [catPages[0]]).forEach(p => mainPages.push({ ...p, _cat: cat }));
+                // For sub-categories: show only top entry in main dropdown
+                const top = catPages[0];
+                mainPages.push({ ...top, _cat: cat, label: cat + ' (Übersicht)' });
+            } else if (cat === 'Sonstige') {
+                // Skip Sonstige in main dropdown - too many low-value pages
             } else {
-                catPages.forEach(p => mainPages.push({ ...p, _cat: cat }));
+                // Show top pages directly
+                catPages.slice(0, MAX_MAIN_PAGES).forEach(p => mainPages.push({ ...p, _cat: cat }));
             }
         });
 
@@ -157,10 +161,6 @@ const App = (() => {
     function getSubPages(category) {
         return INDEX.pages
             .filter(p => p.category === category)
-            .filter(p => {
-                const l = p.label.toLowerCase();
-                return !l.includes('alle ') && !l.includes('übersicht');
-            })
             .sort((a, b) => b.sessions - a.sessions);
     }
 
@@ -216,6 +216,7 @@ const App = (() => {
     function updateSubDropdown(category) {
         const subSel = document.getElementById('sub-select');
         const subGroup = document.getElementById('sub-select-group');
+        const subLabel = document.getElementById('sub-select-label');
 
         if (!category || !SUB_CATEGORIES.includes(category)) {
             subGroup.style.display = 'none';
@@ -225,10 +226,20 @@ const App = (() => {
         const subPages = getSubPages(category);
         if (subPages.length === 0) { subGroup.style.display = 'none'; return; }
 
+        // Dynamic label based on category
+        const labels = {
+            'Bachelor': 'Studiengang',
+            'Master': 'Studiengang',
+            'Standorte': 'Standort',
+            'Beratung & Service': 'Seite',
+            'Hochschulbereiche': 'Bereich'
+        };
+        if (subLabel) subLabel.textContent = labels[category] || 'Detailseite';
+
         subSel.innerHTML = '';
         const defaultOpt = document.createElement('option');
         defaultOpt.value = '';
-        defaultOpt.textContent = '– ' + category + '-Studiengang wählen –';
+        defaultOpt.textContent = '– ' + category + ' wählen –';
         subSel.appendChild(defaultOpt);
 
         subPages.forEach(p => {
@@ -657,8 +668,7 @@ const App = (() => {
     function clearCharts() {
         ['chart-trend', 'chart-traffic-trend', 'chart-sources-donut', 'chart-paid-organic',
          'chart-device-donut', 'chart-device-duration', 'chart-cities', 'chart-events',
-         'chart-funnel', 'chart-conv-pages', 'chart-conv-by-source', 'chart-sankey',
-         'chart-category-donut', 'chart-treemap'].forEach(id => {
+         'chart-funnel', 'chart-conv-pages', 'chart-conv-by-source', 'chart-sankey'].forEach(id => {
             const el = document.getElementById(id);
             if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0, 0, el.width, el.height); }
         });
@@ -677,11 +687,9 @@ const App = (() => {
         switch (tab) {
             case 'overview':
                 renderOverviewKPIs(agg, days);
+                if (page) Charts.trendLine('chart-trend', daily);
                 const distPages = getTrafficDistPages();
                 Charts.trafficBars('traffic-bars', distPages, INDEX.categories, selectPage);
-                Charts.categoryDonut('chart-category-donut', distPages, INDEX.categories);
-                Charts.trafficTreemap('chart-treemap', distPages, INDEX.categories, selectPage);
-                if (page) Charts.trendLine('chart-trend', daily);
                 break;
 
             case 'traffic':

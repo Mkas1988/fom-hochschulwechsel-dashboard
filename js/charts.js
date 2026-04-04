@@ -335,7 +335,7 @@ const Charts = (() => {
     }
 
     function eventsBar(id, events) {
-        const all = events.slice(0, 8);
+        const all = events;
         render(id, {
             type: 'bar',
             data: { labels: all.map(e => e.name), datasets: [{ label: 'Anzahl', data: all.map(e => e.count), backgroundColor: PALETTE.slice(0, all.length), borderRadius: 8 }] },

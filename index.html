@@ -44,7 +44,7 @@
                 <select id="page-select"></select>
             </div>
             <div class="filter-item" id="sub-select-group" style="display:none">
-                <label>Studiengang</label>
+                <label id="sub-select-label">Detailseite</label>
                 <select id="sub-select"></select>
             </div>
             <div class="filter-dates" id="filter-dates">
@@ -100,25 +100,16 @@
             </div>
 
             <div class="section">
-                <h2 class="section-title">Seiten im Vergleich</h2>
-                <div class="grid">
-                    <div class="card">
-                        <h3>Top-Seiten nach Sessions</h3>
-                        <div id="traffic-bars"></div>
-                    </div>
-                    <div class="card">
-                        <h3>Kategorie-Verteilung</h3>
-                        <canvas id="chart-category-donut" style="max-height:200px"></canvas>
-                        <h3 style="margin-top:var(--sp-4)">Treemap</h3>
-                        <div style="height:200px"><canvas id="chart-treemap"></canvas></div>
-                    </div>
+                <h2 class="section-title">Täglicher Verlauf</h2>
+                <div class="card" style="height:300px">
+                    <canvas id="chart-trend"></canvas>
                 </div>
             </div>
 
             <div class="section">
-                <h2 class="section-title">Täglicher Verlauf</h2>
-                <div class="card" style="height:300px">
-                    <canvas id="chart-trend"></canvas>
+                <h2 class="section-title">Alle Seiten nach Sessions</h2>
+                <div class="card">
+                    <div id="traffic-bars"></div>
                 </div>
             </div>
         </div>
