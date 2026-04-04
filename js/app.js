@@ -1,479 +1,131 @@
-// ── FOM Webseite Analyse App ──
+// ── FOM · Build Your Analytics – Report Builder ──
 const App = (() => {
     let DATA = null;
     let INDEX = null;
-    let state = {
-        pagePath: '',
-        dateStart: '',
-        dateEnd: '',
-        activeTab: 'overview',
-        selectedConversions: new Set(),
-        trafficMetric: 'pv-sessions',
-        domain: 'fom' // 'all', 'fom', 'international'
-    };
+    let reportCounter = 0;
 
-    const NON_DATE_TABS = ['sources', 'devices', 'conversions', 'paths'];
-
-    const KEY_CONVERSIONS = {
-        'thank-you-page-anmeldung': 'Online-Anmeldung',
-        'thank-you-page-infomaterial': 'Infomaterial-Bestellung',
-        'thank-you-page-dualmatch': 'DualMatch-Anfrage',
-        'anmeldung': 'Anmeldung (Formular)',
-        'studienberatung': 'Studienberatung',
-        'studienberatung-oa': 'Studienberatung (Online)'
-    };
-
-    const GENERAL_CONVERSIONS = {
-        'Sessions gesamt': 'Sessions',
-        'Conversions': 'Gesamt-Conversions',
-        'bachelor': 'Bachelor-Seiten',
-        'master': 'Master-Seiten',
-        'dual': 'Dual-Seiten',
-        'studiengangsfinder': 'Studiengangsfinder',
-        'sofortcheck': 'Sofortcheck',
-        'kontakt': 'Kontakt',
-        '/info-material/': 'Infomaterial-Seite',
-        '/': 'Startseite',
-        'de': 'DE-Seite',
-        'last-call-bachelor': 'Last Call Bachelor',
-        'last-call-bachelor-dual': 'Last Call Dual',
-        'international-master': 'Internat. Master',
-        '120-ects-master': '120-ECTS Master',
-        '90-ects-master': '90-ECTS Master',
-        '60-ects-master': '60-ECTS Master',
-        'business-administration-ba': 'Business Admin. (BA)'
-    };
-
-    const ALL_CONV_LABELS = { ...KEY_CONVERSIONS, ...GENERAL_CONVERSIONS };
-
-    // ── Init ──
-    function init(detailedData, pageIndex) {
-        DATA = detailedData;
-        INDEX = pageIndex;
-
-        // Deduplicate pages-index: merge same-label entries within same category
-        deduplicateIndex();
-
-        state.dateStart = DATA.dateRange.start;
-        state.dateEnd = DATA.dateRange.end;
-
-        Object.keys(KEY_CONVERSIONS).forEach(k => state.selectedConversions.add(k));
-
+    function init(data, index) {
+        DATA = data;
+        INDEX = index;
         setupLogin();
-        setupFilterToggle();
-        setupDomainFilter();
-        populateDropdown();
-        setupDatepicker();
-        setupTabs();
-        setupPresets();
-        setupConversionFilter();
-        setupMetricToggle();
-        updateDateDimming();
-    }
-
-    // ── Deduplicate Index ──
-    function deduplicateIndex() {
-        const merged = {};
-        INDEX.pages.forEach(p => {
-            const key = p.label + '||' + p.category;
-            if (!merged[key]) {
-                merged[key] = { ...p };
-            } else {
-                // Keep path with higher sessions, sum totals
-                merged[key].sessions += p.sessions;
-                if (p.sessions > merged[key]._maxSessions) {
-                    merged[key].path = p.path;
-                }
-                merged[key]._maxSessions = Math.max(merged[key]._maxSessions || 0, p.sessions);
-            }
-        });
-        INDEX.pages = Object.values(merged).map(p => {
-            delete p._maxSessions;
-            return p;
-        });
+        setupAskInput();
+        setupBlocks();
     }
 
     // ── Login ──
     function setupLogin() {
         const input = document.getElementById('password-input');
         const btn = document.getElementById('login-btn');
-
         function check() {
             if (input.value === 'Fom!1991') {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('dashboard').style.display = 'block';
-                renderAll();
             } else {
                 document.getElementById('login-error').style.display = 'block';
                 input.value = '';
                 input.focus();
             }
         }
-
         btn.addEventListener('click', check);
         input.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
     }
 
-    // ── Mobile Filter Toggle ──
-    function setupFilterToggle() {
-        const toggle = document.getElementById('filter-toggle');
-        const bar = document.getElementById('filter-bar');
-        if (toggle && bar) {
-            toggle.addEventListener('click', () => {
-                bar.classList.toggle('open');
-                toggle.textContent = bar.classList.contains('open') ? 'Filter ▴' : 'Filter ▾';
-            });
-        }
-    }
+    // ── AI Ask Input ──
+    function setupAskInput() {
+        const input = document.getElementById('ask-input');
+        const btn = document.getElementById('ask-btn');
+        const loading = document.getElementById('ask-loading');
+        const keySetup = document.getElementById('key-setup');
+        const keyInput = document.getElementById('key-input');
+        const keySave = document.getElementById('key-save');
 
-    function updateDateDimming() {
-        const dates = document.getElementById('filter-dates');
-        if (dates) dates.classList.toggle('dimmed', NON_DATE_TABS.includes(state.activeTab));
-    }
+        // Show key setup if no key stored
+        if (!AI.hasKey()) keySetup.style.display = 'flex';
 
-    // ── Domain Filter ──
-    // Classifies pages by domain based on path patterns
-    function isInternationalPage(path) {
-        return path.startsWith('/en/') ||
-               path.includes('/international') ||
-               path.includes('international-') ||
-               path.includes('-international');
-    }
-
-    function matchesDomainFilter(path) {
-        if (state.domain === 'all') return true;
-        const isIntl = isInternationalPage(path);
-        return state.domain === 'international' ? isIntl : !isIntl;
-    }
-
-    function setupDomainFilter() {
-        const sel = document.getElementById('domain-select');
-        if (!sel) return;
-        sel.addEventListener('change', () => {
-            state.domain = sel.value;
-            // Re-populate dropdown with filtered pages
-            repopulateDropdown();
-            renderAll();
-        });
-    }
-
-    function repopulateDropdown() {
-        const sel = document.getElementById('page-select');
-        sel.innerHTML = '';
-        const mainPages = getMainPages();
-
-        const groups = {};
-        INDEX.categories.forEach(cat => groups[cat] = []);
-        mainPages.forEach(p => { if (groups[p._cat]) groups[p._cat].push(p); });
-
-        INDEX.categories.forEach(cat => {
-            const items = (groups[cat] || []).filter(p => matchesDomainFilter(p.path));
-            if (items.length === 0) return;
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = cat;
-            items.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p.path;
-                opt.dataset.category = p._cat;
-                const sessions = p.sessions >= 1000 ? Math.round(p.sessions / 1000) + 'k' : p.sessions;
-                opt.textContent = p.label + '  ·  ' + sessions + ' Sessions';
-                if (!DATA.pages.some(dp => dp.path === p.path)) opt.style.color = '#9a9a9a';
-                optgroup.appendChild(opt);
-            });
-            sel.appendChild(optgroup);
-        });
-
-        // Select first option
-        if (sel.options.length > 0) {
-            state.pagePath = sel.options[0].value;
-            sel.value = state.pagePath;
-            const opt = sel.options[sel.selectedIndex];
-            updateSubDropdown(opt?.dataset?.category);
-        }
-    }
-
-    // ── Page Dropdowns ──
-    // Categories that get a sub-dropdown for individual pages
-    const SUB_CATEGORIES = ['Bachelor', 'Master', 'Standorte', 'Beratung & Service', 'Hochschulbereiche'];
-    // Max pages to show in main dropdown per category (for non-sub categories)
-    const MAX_MAIN_PAGES = 8;
-
-    function getMainPages() {
-        const pages = INDEX.pages;
-        const mainPages = [];
-
-        INDEX.categories.forEach(cat => {
-            const catPages = pages.filter(p => p.category === cat).sort((a, b) => b.sessions - a.sessions);
-            if (catPages.length === 0) return;
-
-            if (SUB_CATEGORIES.includes(cat)) {
-                // For sub-categories: show only top entry in main dropdown
-                const top = catPages[0];
-                mainPages.push({ ...top, _cat: cat, label: cat + ' (Übersicht)' });
-            } else if (cat === 'Sonstige') {
-                // Skip Sonstige in main dropdown - too many low-value pages
-            } else {
-                // Show top pages directly
-                catPages.slice(0, MAX_MAIN_PAGES).forEach(p => mainPages.push({ ...p, _cat: cat }));
+        keySave.addEventListener('click', () => {
+            const k = keyInput.value.trim();
+            if (k) {
+                AI.setKey(k);
+                keySetup.style.display = 'none';
             }
         });
 
-        return mainPages;
-    }
-
-    function getSubPages(category) {
-        return INDEX.pages
-            .filter(p => p.category === category)
-            .sort((a, b) => b.sessions - a.sessions);
-    }
-
-    function populateDropdown() {
-        const sel = document.getElementById('page-select');
-        const subSel = document.getElementById('sub-select');
-        const mainPages = getMainPages();
-
-        const groups = {};
-        INDEX.categories.forEach(cat => groups[cat] = []);
-        mainPages.forEach(p => { if (groups[p._cat]) groups[p._cat].push(p); });
-
-        INDEX.categories.forEach(cat => {
-            const items = groups[cat];
-            if (!items || items.length === 0) return;
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = cat;
-            items.forEach(p => {
-                const opt = document.createElement('option');
-                opt.value = p.path;
-                opt.dataset.category = p._cat;
-                const sessions = p.sessions >= 1000 ? Math.round(p.sessions / 1000) + 'k' : p.sessions;
-                opt.textContent = p.label + '  ·  ' + sessions + ' Sessions';
-                if (!DATA.pages.some(dp => dp.path === p.path)) opt.style.color = '#9a9a9a';
-                optgroup.appendChild(opt);
-            });
-            sel.appendChild(optgroup);
+        keyInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') keySave.click();
         });
 
-        if (DATA.pages.length > 0) {
-            state.pagePath = DATA.pages[0].path;
-            sel.value = state.pagePath;
+        async function ask() {
+            const q = input.value.trim();
+            if (!q) return;
+            if (!AI.hasKey()) {
+                keySetup.style.display = 'flex';
+                keyInput.focus();
+                return;
+            }
+            btn.disabled = true;
+            loading.classList.add('visible');
+            try {
+                const config = await AI.ask(q);
+                addReport(config);
+                input.value = '';
+            } catch (e) {
+                console.error(e);
+            }
+            btn.disabled = false;
+            loading.classList.remove('visible');
         }
 
-        sel.addEventListener('change', () => {
-            const opt = sel.options[sel.selectedIndex];
-            state.pagePath = sel.value;
-            updateSubDropdown(opt?.dataset?.category);
-            renderAll();
-        });
-
-        subSel.addEventListener('change', () => {
-            if (subSel.value) {
-                state.pagePath = subSel.value;
-                renderAll();
-            }
-        });
-
-        const initOpt = sel.options[sel.selectedIndex];
-        updateSubDropdown(initOpt?.dataset?.category);
+        btn.addEventListener('click', ask);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
     }
 
-    function updateSubDropdown(category) {
-        const subSel = document.getElementById('sub-select');
-        const subGroup = document.getElementById('sub-select-group');
-        const subLabel = document.getElementById('sub-select-label');
-
-        if (!category || !SUB_CATEGORIES.includes(category)) {
-            subGroup.style.display = 'none';
-            return;
-        }
-
-        const subPages = getSubPages(category);
-        if (subPages.length === 0) { subGroup.style.display = 'none'; return; }
-
-        // Dynamic label based on category
-        const labels = {
-            'Bachelor': 'Studiengang',
-            'Master': 'Studiengang',
-            'Standorte': 'Standort',
-            'Beratung & Service': 'Seite',
-            'Hochschulbereiche': 'Bereich'
-        };
-        if (subLabel) subLabel.textContent = labels[category] || 'Detailseite';
-
-        subSel.innerHTML = '';
-        const defaultOpt = document.createElement('option');
-        defaultOpt.value = '';
-        defaultOpt.textContent = '– ' + category + ' wählen –';
-        subSel.appendChild(defaultOpt);
-
-        subPages.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.path;
-            const sessions = p.sessions >= 1000 ? Math.round(p.sessions / 1000) + 'k' : p.sessions;
-            opt.textContent = p.label + '  ·  ' + sessions + ' Sessions';
-            if (!DATA.pages.some(dp => dp.path === p.path)) opt.style.color = '#9a9a9a';
-            subSel.appendChild(opt);
-        });
-
-        subGroup.style.display = 'flex';
-        subSel.value = '';
-    }
-
-    function selectPage(path) {
-        const sel = document.getElementById('page-select');
-        const subSel = document.getElementById('sub-select');
-
-        const mainOpt = Array.from(sel.options).find(o => o.value === path);
-        if (mainOpt) {
-            state.pagePath = path;
-            sel.value = path;
-            updateSubDropdown(mainOpt.dataset?.category);
-        } else {
-            const indexPage = INDEX.pages.find(p => p.path === path);
-            if (indexPage && SUB_CATEGORIES.includes(indexPage.category)) {
-                const overviewOpt = Array.from(sel.options).find(o => o.dataset?.category === indexPage.category);
-                if (overviewOpt) {
-                    sel.value = overviewOpt.value;
-                    updateSubDropdown(indexPage.category);
-                    subSel.value = path;
-                }
-            }
-            state.pagePath = path;
-        }
-
-        renderAll();
-    }
-
-    // ── Conversion Filter ──
-    function setupConversionFilter() {
-        const keyContainer = document.getElementById('conv-chips-key');
-        const generalContainer = document.getElementById('conv-chips-general');
-
-        const availableSteps = new Set();
-        DATA.pages.forEach(p => {
-            if (p.conversions?.funnel) {
-                p.conversions.funnel.forEach(f => availableSteps.add(f.step));
-            }
-        });
-
-        Object.entries(KEY_CONVERSIONS).forEach(([step, label]) => {
-            if (!availableSteps.has(step)) return;
-            keyContainer.appendChild(createChip(step, label, true));
-        });
-
-        Object.entries(GENERAL_CONVERSIONS).forEach(([step, label]) => {
-            if (!availableSteps.has(step)) return;
-            generalContainer.appendChild(createChip(step, label, false));
-        });
-    }
-
-    function createChip(step, label, isKey) {
-        const chip = document.createElement('span');
-        chip.className = 'chip' + (isKey ? ' key-chip' : '') + (state.selectedConversions.has(step) ? ' active' : '');
-        chip.dataset.step = step;
-        chip.textContent = label;
-
-        chip.addEventListener('click', () => {
-            if (state.selectedConversions.has(step)) {
-                state.selectedConversions.delete(step);
-                chip.classList.remove('active');
-            } else {
-                state.selectedConversions.add(step);
-                chip.classList.add('active');
-            }
-            if (state.activeTab === 'conversions') renderTab('conversions');
-        });
-
-        return chip;
-    }
-
-    // ── Metric Toggle ──
-    function setupMetricToggle() {
-        document.querySelectorAll('.toggle-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                state.trafficMetric = btn.dataset.metric;
-                if (state.activeTab === 'traffic') renderTab('traffic');
-            });
-        });
-    }
-
-    // ── Datepicker ──
-    function setupDatepicker() {
-        const startEl = document.getElementById('date-start');
-        const endEl = document.getElementById('date-end');
-        const applyBtn = document.getElementById('date-apply');
-
-        startEl.value = state.dateStart;
-        endEl.value = state.dateEnd;
-        startEl.min = DATA.dateRange.start;
-        startEl.max = DATA.dateRange.end;
-        endEl.min = DATA.dateRange.start;
-        endEl.max = DATA.dateRange.end;
-
-        applyBtn.addEventListener('click', () => {
-            state.dateStart = startEl.value;
-            state.dateEnd = endEl.value;
-            clearPresetActive();
-            renderAll();
-        });
-    }
-
-    function setupPresets() {
-        document.querySelectorAll('.btn-preset').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const days = parseInt(btn.dataset.days);
-                const end = new Date(DATA.dateRange.end);
-                const start = new Date(end);
-
-                if (days === 0) {
-                    document.getElementById('date-start').value = DATA.dateRange.start;
-                    document.getElementById('date-end').value = DATA.dateRange.end;
-                    state.dateStart = DATA.dateRange.start;
-                    state.dateEnd = DATA.dateRange.end;
-                } else {
-                    start.setDate(end.getDate() - days);
-                    const s = start.toISOString().split('T')[0];
-                    document.getElementById('date-start').value = s;
-                    document.getElementById('date-end').value = DATA.dateRange.end;
-                    state.dateStart = s;
-                    state.dateEnd = DATA.dateRange.end;
-                }
-
-                clearPresetActive();
-                btn.classList.add('active');
-                renderAll();
-            });
-        });
-    }
-
-    function clearPresetActive() {
-        document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-    }
-
-    // ── Tabs ──
-    function setupTabs() {
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                state.activeTab = btn.dataset.tab;
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                document.querySelectorAll('.tab-panel').forEach(c => c.classList.remove('active'));
-                document.getElementById('tab-' + state.activeTab).classList.add('active');
-                updateDateDimming();
-                renderTab(state.activeTab);
+    // ── Block Cards ──
+    function setupBlocks() {
+        document.querySelectorAll('.block-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const type = card.dataset.block;
+                const configs = {
+                    kpis: { type: 'kpis', pageFilter: 'all', title: 'Traffic-Überblick', subtitle: 'KPIs & Täglicher Trend' },
+                    trend: { type: 'trend', pageFilter: 'all', title: 'Trend-Analyse', subtitle: 'Zeitlicher Verlauf der Metriken' },
+                    funnel: { type: 'funnel', pageFilter: 'all', title: 'Conversion-Report', subtitle: 'Funnel & Schlüsselereignisse' },
+                    sources: { type: 'sources', pageFilter: 'all', title: 'Traffic-Quellen', subtitle: 'Kanäle & Herkunft' },
+                    devices: { type: 'devices', pageFilter: 'all', title: 'Geräte-Split', subtitle: 'Mobile, Desktop, Tablet' },
+                    geo: { type: 'geo', pageFilter: 'all', title: 'Geo-Analyse', subtitle: 'Top-Städte nach Sessions' },
+                    events: { type: 'events', pageFilter: 'all', title: 'Events', subtitle: 'Alle Interaktionen auf der Seite' },
+                    topPages: { type: 'topPages', pageFilter: 'all', title: 'Top-Seiten', subtitle: 'Alle Seiten nach Sessions' }
+                };
+                addReport(configs[type] || configs.kpis);
             });
         });
     }
 
     // ── Data Helpers ──
-    function getDetailedPage() { return DATA.pages.find(p => p.path === state.pagePath); }
-    function getIndexPage() { return INDEX.pages.find(p => p.path === state.pagePath); }
 
-    function getFilteredDaily() {
-        const page = getDetailedPage();
-        if (!page || !page.daily) return [];
-        return page.daily.filter(d => d.date >= state.dateStart && d.date <= state.dateEnd);
+    function getPage(pageFilter) {
+        if (!pageFilter || pageFilter === 'all') return DATA.pages[0]; // Default: Startseite
+        if (pageFilter.startsWith('category:')) {
+            const cat = pageFilter.replace('category:', '');
+            const catPages = INDEX.pages.filter(p => p.category === cat).sort((a, b) => b.sessions - a.sessions);
+            if (catPages.length > 0) {
+                return DATA.pages.find(p => p.path === catPages[0].path) || DATA.pages[0];
+            }
+            return DATA.pages[0];
+        }
+        if (pageFilter.startsWith('path:')) {
+            const path = pageFilter.replace('path:', '');
+            return DATA.pages.find(p => p.path === path) || DATA.pages[0];
+        }
+        // Try direct match
+        return DATA.pages.find(p => p.path === pageFilter) ||
+               DATA.pages.find(p => p.path.includes(pageFilter)) ||
+               DATA.pages[0];
+    }
+
+    function filterDaily(page, dateRange) {
+        if (!page?.daily) return [];
+        const start = dateRange?.start || DATA.dateRange.start;
+        const end = dateRange?.end || DATA.dateRange.end;
+        return page.daily.filter(d => d.date >= start && d.date <= end);
     }
 
     function aggregateDaily(daily) {
@@ -488,335 +140,265 @@ const App = (() => {
         };
     }
 
-    function filterConversionFunnel(funnel) {
-        if (!funnel) return [];
-        if (state.selectedConversions.size === 0) return [];
-        return funnel
-            .filter(f => state.selectedConversions.has(f.step))
-            .map(f => ({ step: ALL_CONV_LABELS[f.step] || f.step, count: f.count }));
-    }
-
-    function getTrafficDistPages() {
-        const isFullRange = state.dateStart === DATA.dateRange.start && state.dateEnd === DATA.dateRange.end;
-
-        const detailedPages = DATA.pages.map(dp => {
-            const daily = dp.daily ? dp.daily.filter(d => d.date >= state.dateStart && d.date <= state.dateEnd) : [];
-            const sessions = daily.reduce((sum, d) => sum + (d.sessions || 0), 0);
-            const indexEntry = INDEX.pages.find(ip => ip.path === dp.path);
-            return {
-                path: dp.path,
-                label: indexEntry?.label || dp.label || dp.path,
-                sessions, category: indexEntry?.category || 'Sonstige'
-            };
-        });
-
-        if (isFullRange) {
-            const detailedPaths = new Set(detailedPages.map(p => p.path));
-            const otherPages = INDEX.pages.filter(p => !detailedPaths.has(p.path));
-            return [...detailedPages, ...otherPages]
-                .filter(p => matchesDomainFilter(p.path))
-                .sort((a, b) => b.sessions - a.sessions);
-        }
-        return detailedPages
-            .filter(p => matchesDomainFilter(p.path))
-            .sort((a, b) => b.sessions - a.sessions);
-    }
-
-    // ── Expandable Path Tree ──
+    function fmtNum(n) { return n.toLocaleString('de-DE'); }
 
     function getPageLabel(path) {
         const idx = INDEX.pages.find(p => p.path === path);
-        if (idx) return idx.label;
-        return path.replace(/^\/de\//, '/').replace(/\.html$/, '').split('/').pop() || path;
+        return idx?.label || path;
     }
 
-    function getFollowUps(path) {
-        const page = DATA.pages.find(p => p.path === path);
-        if (page?.conversions?.followUpPages) return page.conversions.followUpPages;
-        return null;
+    // ── Build Page Selector ──
+    function buildPageSelector(selected) {
+        let html = '<select class="report-page-select">';
+        DATA.pages.forEach(p => {
+            const label = getPageLabel(p.path);
+            const sel = p.path === selected ? ' selected' : '';
+            html += '<option value="' + p.path + '"' + sel + '>' + label + '</option>';
+        });
+        html += '</select>';
+        return html;
     }
 
-    function renderPathTree(containerId, followUpPages, sourceLabel) {
+    // ── Add Report Card ──
+    function addReport(config) {
+        const area = document.getElementById('report-area');
+        const empty = document.getElementById('report-empty');
+        if (empty) empty.style.display = 'none';
+
+        const id = 'report-' + (++reportCounter);
+        const page = getPage(config.pageFilter);
+        const daily = filterDaily(page, config.dateRange);
+
+        const card = document.createElement('div');
+        card.className = 'report-card';
+        card.id = id;
+
+        // Header
+        card.innerHTML = `
+            <div class="report-card-header">
+                <div>
+                    <div class="report-card-title">${esc(config.title || 'Analyse')}</div>
+                    <div class="report-card-subtitle">${esc(config.subtitle || '')}</div>
+                </div>
+                <div class="report-card-controls">
+                    ${buildPageSelector(page.path)}
+                    <button class="report-close" title="Entfernen">&times;</button>
+                </div>
+            </div>
+            <div class="report-card-body" id="${id}-body"></div>
+        `;
+
+        area.insertBefore(card, area.firstChild);
+
+        // Close button
+        card.querySelector('.report-close').addEventListener('click', () => {
+            card.remove();
+            if (area.querySelectorAll('.report-card').length === 0 && empty) {
+                empty.style.display = 'block';
+            }
+        });
+
+        // Page selector change
+        card.querySelector('.report-page-select').addEventListener('change', (e) => {
+            const newPage = DATA.pages.find(p => p.path === e.target.value);
+            if (newPage) renderReportBody(id + '-body', config.type, newPage, config.dateRange);
+        });
+
+        // Render body
+        renderReportBody(id + '-body', config.type, page, config.dateRange);
+    }
+
+    // ── Render Report Body ──
+    function renderReportBody(containerId, type, page, dateRange) {
         const el = document.getElementById(containerId);
         if (!el) return;
 
-        const sorted = [...followUpPages]
-            .filter(p => p.users > 0)
-            .sort((a, b) => b.users - a.users);
-        const maxUsers = sorted[0]?.users || 1;
-        const top = sorted.slice(0, 20);
-
-        let html = '<div class="path-tree">';
-        html += '<div class="path-source">' + escHtml(sourceLabel) + '</div>';
-
-        top.forEach(p => {
-            const label = getPageLabel(p.page);
-            const pct = Math.max(3, (p.users / maxUsers) * 100);
-            const hasChildren = !!getFollowUps(p.page);
-            const convBadge = p.conversions > 0
-                ? '<span class="path-conv">' + p.conversions + ' Conv.</span>'
-                : '';
-
-            html += '<div class="path-item' + (hasChildren ? ' expandable' : '') + '" data-path="' + escHtml(p.page) + '">';
-            html += '<div class="path-item-header">';
-            if (hasChildren) html += '<span class="path-arrow">&#9654;</span>';
-            else html += '<span class="path-arrow-spacer"></span>';
-            html += '<span class="path-item-label" title="' + escHtml(p.page) + '">' + escHtml(label) + '</span>';
-            html += '<span class="path-item-bar"><span class="path-item-fill" style="width:' + pct + '%"></span></span>';
-            html += '<span class="path-item-count">' + fmtNum(p.users) + '</span>';
-            html += convBadge;
-            html += '</div>';
-            html += '<div class="path-children" style="display:none"></div>';
-            html += '</div>';
-        });
-
-        html += '</div>';
-        el.innerHTML = html;
-
-        // Bind click handlers for expandable items
-        el.querySelectorAll('.path-item.expandable > .path-item-header').forEach(header => {
-            header.addEventListener('click', () => {
-                const item = header.parentElement;
-                const childrenEl = item.querySelector('.path-children');
-                const arrow = header.querySelector('.path-arrow');
-                const path = item.dataset.path;
-
-                if (childrenEl.style.display === 'none') {
-                    // Expand: load level 2
-                    childrenEl.style.display = 'block';
-                    arrow.classList.add('open');
-                    if (!childrenEl.dataset.loaded) {
-                        renderSubLevel(childrenEl, path, 2);
-                        childrenEl.dataset.loaded = 'true';
-                    }
-                } else {
-                    childrenEl.style.display = 'none';
-                    arrow.classList.remove('open');
-                }
-            });
-        });
-    }
-
-    function renderSubLevel(container, path, depth) {
-        const followUps = getFollowUps(path);
-        if (!followUps || followUps.length === 0) {
-            container.innerHTML = '<div class="path-empty">Keine Folgeseiten verfügbar</div>';
-            return;
-        }
-
-        const sorted = [...followUps]
-            .filter(p => p.users > 0 && p.page !== path)
-            .sort((a, b) => b.users - a.users);
-        const maxUsers = sorted[0]?.users || 1;
-        const top = sorted.slice(0, 12);
-
-        let html = '';
-        top.forEach(p => {
-            const label = getPageLabel(p.page);
-            const pct = Math.max(3, (p.users / maxUsers) * 100);
-            const hasChildren = depth < 3 && !!getFollowUps(p.page);
-            const convBadge = p.conversions > 0
-                ? '<span class="path-conv">' + p.conversions + ' Conv.</span>'
-                : '';
-
-            html += '<div class="path-item' + (hasChildren ? ' expandable' : '') + '" data-path="' + escHtml(p.page) + '">';
-            html += '<div class="path-item-header">';
-            if (hasChildren) html += '<span class="path-arrow">&#9654;</span>';
-            else html += '<span class="path-arrow-spacer"></span>';
-            html += '<span class="path-item-label" title="' + escHtml(p.page) + '">' + escHtml(label) + '</span>';
-            html += '<span class="path-item-bar"><span class="path-item-fill path-fill-l' + depth + '" style="width:' + pct + '%"></span></span>';
-            html += '<span class="path-item-count">' + fmtNum(p.users) + '</span>';
-            html += convBadge;
-            html += '</div>';
-            html += '<div class="path-children" style="display:none"></div>';
-            html += '</div>';
-        });
-
-        container.innerHTML = html;
-
-        // Bind click for level 3
-        if (depth < 3) {
-            container.querySelectorAll('.path-item.expandable > .path-item-header').forEach(header => {
-                header.addEventListener('click', () => {
-                    const item = header.parentElement;
-                    const childrenEl = item.querySelector('.path-children');
-                    const arrow = header.querySelector('.path-arrow');
-
-                    if (childrenEl.style.display === 'none') {
-                        childrenEl.style.display = 'block';
-                        arrow.classList.add('open');
-                        if (!childrenEl.dataset.loaded) {
-                            renderSubLevel(childrenEl, item.dataset.path, depth + 1);
-                            childrenEl.dataset.loaded = 'true';
-                        }
-                    } else {
-                        childrenEl.style.display = 'none';
-                        arrow.classList.remove('open');
-                    }
-                });
-            });
-        }
-    }
-
-    function escHtml(s) {
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    // ── KPI Renderers ──
-
-    function renderOverviewKPIs(agg, days) {
-        setText('kpi-ov-pv', fmtNum(agg.pv));
-        setText('kpi-ov-pv-sub', 'Ø ' + Math.round(agg.pv / days) + '/Tag');
-        setText('kpi-ov-sessions', fmtNum(agg.sessions));
-        setText('kpi-ov-sessions-sub', 'Ø ' + Math.round(agg.sessions / days) + '/Tag');
-        setText('kpi-ov-users', fmtNum(agg.users));
-        setText('kpi-ov-users-sub', Math.round(agg.newUsers / Math.max(agg.users, 1) * 100) + '% neue Nutzer');
-        setText('kpi-ov-engagement', (agg.engRate * 100).toFixed(1).replace('.', ',') + '%');
-        setText('kpi-ov-bounce', (agg.bounceRate * 100).toFixed(1).replace('.', ',') + '%');
-        setText('kpi-ov-duration', Math.round(agg.avgDuration) + 's');
-        setText('kpi-ov-pages', agg.sessions > 0 ? (agg.pv / agg.sessions).toFixed(2).replace('.', ',') : '–');
-        setText('kpi-ov-conversions', fmtNum(agg.conversions));
-        const convRate = agg.sessions > 0 ? (agg.conversions / agg.sessions * 100).toFixed(1).replace('.', ',') + '%' : '–';
-        setText('kpi-ov-conversions-sub', convRate + ' Conv. Rate');
-
-        const card = document.getElementById('kpi-ov-conv-card');
-        if (card) card.className = 'kpi ' + (agg.conversions > 0 ? 'accent' : 'danger');
-    }
-
-    function renderTrafficKPIs(agg, days) {
-        setText('kpi-tr-pv', fmtNum(agg.pv));
-        setText('kpi-tr-pv-sub', 'Ø ' + Math.round(agg.pv / days) + '/Tag');
-        setText('kpi-tr-sessions', fmtNum(agg.sessions));
-        setText('kpi-tr-sessions-sub', 'Ø ' + Math.round(agg.sessions / days) + '/Tag');
-        setText('kpi-tr-users', fmtNum(agg.users));
-        setText('kpi-tr-users-sub', Math.round(agg.newUsers / Math.max(agg.users, 1) * 100) + '% neue Nutzer');
-        setText('kpi-tr-conversions', fmtNum(agg.conversions));
-        const convRate = agg.sessions > 0 ? (agg.conversions / agg.sessions * 100).toFixed(1).replace('.', ',') + '%' : '–';
-        setText('kpi-tr-conversions-sub', convRate + ' Conv. Rate');
-
-        const card = document.getElementById('kpi-tr-conv-card');
-        if (card) card.className = 'kpi ' + (agg.conversions > 0 ? 'accent' : 'danger');
-    }
-
-    function clearOverviewKPIs() {
-        ['pv', 'sessions', 'users', 'engagement', 'bounce', 'duration', 'pages', 'conversions'].forEach(k => setText('kpi-ov-' + k, '–'));
-        setText('kpi-ov-pv-sub', ''); setText('kpi-ov-sessions-sub', ''); setText('kpi-ov-users-sub', ''); setText('kpi-ov-conversions-sub', '');
-    }
-
-    function clearTrafficKPIs() {
-        ['pv', 'sessions', 'users', 'conversions'].forEach(k => setText('kpi-tr-' + k, '–'));
-        setText('kpi-tr-pv-sub', ''); setText('kpi-tr-sessions-sub', ''); setText('kpi-tr-users-sub', ''); setText('kpi-tr-conversions-sub', '');
-    }
-
-    // ── Render ──
-
-    function renderAll() {
-        const detailed = getDetailedPage();
-        const indexPage = getIndexPage();
-        const noDataBanner = document.getElementById('no-data-banner');
-
-        if (!detailed && indexPage) {
-            if (noDataBanner) {
-                noDataBanner.style.display = 'block';
-                noDataBanner.querySelector('.page-name').textContent = indexPage.label;
-                noDataBanner.querySelector('.page-sessions').textContent = fmtNum(indexPage.sessions);
-            }
-            clearOverviewKPIs();
-            clearTrafficKPIs();
-            setText('kpi-ov-sessions', fmtNum(indexPage.sessions));
-            setText('kpi-ov-sessions-sub', 'Gesamtzeitraum');
-            clearCharts();
-        } else {
-            if (noDataBanner) noDataBanner.style.display = 'none';
-            renderTab(state.activeTab);
-        }
-    }
-
-    function clearCharts() {
-        ['chart-trend', 'chart-traffic-trend', 'chart-sources-donut', 'chart-paid-organic',
-         'chart-device-donut', 'chart-device-duration', 'chart-cities', 'chart-events',
-         'chart-funnel', 'chart-conv-pages', 'chart-conv-by-source', 'chart-sankey'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0, 0, el.width, el.height); }
-        });
-        ['table-sources', 'table-followup', 'flow-container', 'path-explorer'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.innerHTML = '<div class="empty">Detaildaten nicht verfügbar.</div>';
-        });
-    }
-
-    function renderTab(tab) {
-        const page = getDetailedPage();
-        const daily = getFilteredDaily();
+        const daily = filterDaily(page, dateRange);
         const agg = aggregateDaily(daily);
         const days = daily.length || 1;
 
-        switch (tab) {
-            case 'overview':
-                renderOverviewKPIs(agg, days);
-                if (page) Charts.trendLine('chart-trend', daily);
-                const distPages = getTrafficDistPages();
-                Charts.trafficBars('traffic-bars', distPages, INDEX.categories, selectPage);
+        el.innerHTML = ''; // Clear previous content
+
+        switch (type) {
+            case 'kpis':
+                renderKPIs(el, agg, days);
+                if (daily.length > 0) {
+                    const trendDiv = addChartWrap(el, 'Täglicher Verlauf', 300);
+                    Charts.trendLine(trendDiv.querySelector('canvas').id, daily);
+                }
                 break;
 
-            case 'traffic':
-                renderTrafficKPIs(agg, days);
-                if (page) Charts.trendLineMetric('chart-traffic-trend', daily, state.trafficMetric);
+            case 'trend':
+                renderKPIsMini(el, agg);
+                const trendDiv = addChartWrap(el, 'Traffic-Trend', 320);
+                if (daily.length > 0) Charts.trendLine(trendDiv.querySelector('canvas').id, daily);
                 break;
 
             case 'sources':
-                if (page?.sources?.length) {
-                    Charts.sourcesDoughnut('chart-sources-donut', page.sources);
-                    Charts.paidVsOrganic('chart-paid-organic', page.sources);
-                    Tables.sourcesTable('table-sources', page.sources);
+                if (page.sources?.length) {
+                    const grid = document.createElement('div');
+                    grid.className = 'grid-2';
+                    const d1 = addChartWrap(grid, 'Nach Kanal');
+                    Charts.sourcesDoughnut(d1.querySelector('canvas').id, page.sources);
+                    const d2 = addChartWrap(grid, 'Paid vs. Organic');
+                    Charts.paidVsOrganic(d2.querySelector('canvas').id, page.sources);
+                    el.appendChild(grid);
+                    const tableDiv = document.createElement('div');
+                    tableDiv.id = containerId + '-table';
+                    el.appendChild(tableDiv);
+                    Tables.sourcesTable(tableDiv.id, page.sources);
+                } else {
+                    el.innerHTML = '<div class="empty">Keine Quellen-Daten für diese Seite verfügbar.</div>';
                 }
                 break;
 
             case 'devices':
-                if (page?.devices?.length) {
-                    Charts.deviceDoughnut('chart-device-donut', page.devices);
-                    Charts.deviceDuration('chart-device-duration', page.devices);
+                if (page.devices?.length) {
+                    const grid = document.createElement('div');
+                    grid.className = 'grid-2';
+                    const d1 = addChartWrap(grid, 'Geräteverteilung');
+                    Charts.deviceDoughnut(d1.querySelector('canvas').id, page.devices);
+                    const d2 = addChartWrap(grid, 'Ø Sitzungsdauer');
+                    Charts.deviceDuration(d2.querySelector('canvas').id, page.devices);
+                    el.appendChild(grid);
+                } else {
+                    el.innerHTML = '<div class="empty">Keine Geräte-Daten verfügbar.</div>';
                 }
-                if (page?.cities?.length) Charts.citiesBar('chart-cities', page.cities);
-                if (page?.events?.length) Charts.eventsBar('chart-events', page.events);
                 break;
 
-            case 'conversions':
-                if (page?.conversions?.funnel?.length) {
-                    // Always show all key events in funnel
-                    const allKeyEvents = page.conversions.funnel
-                        .filter(f => f.step !== 'Sessions gesamt' && f.step !== 'Conversions')
-                        .map(f => ({ step: ALL_CONV_LABELS[f.step] || f.step, count: f.count }))
-                        .filter(f => f.count > 0)
+            case 'geo':
+                if (page.cities?.length) {
+                    const d = addChartWrap(el, 'Top-Städte nach Sessions');
+                    Charts.citiesBar(d.querySelector('canvas').id, page.cities);
+                } else {
+                    el.innerHTML = '<div class="empty">Keine Geo-Daten verfügbar.</div>';
+                }
+                break;
+
+            case 'events':
+                if (page.events?.length) {
+                    const d = addChartWrap(el, 'Alle Events');
+                    Charts.eventsBar(d.querySelector('canvas').id, page.events);
+                } else {
+                    el.innerHTML = '<div class="empty">Keine Event-Daten verfügbar.</div>';
+                }
+                break;
+
+            case 'funnel':
+                if (page.conversions?.funnel?.length) {
+                    const funnelData = page.conversions.funnel
+                        .filter(f => f.count > 0 && f.step !== 'Sessions gesamt' && f.step !== 'Conversions')
+                        .map(f => ({ step: f.step, count: f.count }))
                         .sort((a, b) => b.count - a.count);
-                    if (allKeyEvents.length > 0) {
-                        Charts.funnelBar('chart-funnel', allKeyEvents);
+                    if (funnelData.length > 0) {
+                        const d = addChartWrap(el, 'Conversion-Funnel');
+                        Charts.funnelBar(d.querySelector('canvas').id, funnelData);
                     }
                 }
-                if (page?.sources?.length) Charts.convBySource('chart-conv-by-source', page.sources);
-                if (page?.conversions?.followUpPages?.length) {
-                    Charts.conversionPagesBar('chart-conv-pages', page.conversions.followUpPages);
-                    Tables.followUpTable('table-followup', page.conversions.followUpPages);
+                if (page.conversions?.followUpPages?.length) {
+                    const d = addChartWrap(el, 'Seiten mit Conversions');
+                    Charts.conversionPagesBar(d.querySelector('canvas').id, page.conversions.followUpPages);
+                }
+                if (page.sources?.length) {
+                    const d = addChartWrap(el, 'Conversion-Rate nach Quelle', 260);
+                    Charts.convBySource(d.querySelector('canvas').id, page.sources);
+                }
+                if (!page.conversions?.funnel?.length) {
+                    el.innerHTML = '<div class="empty">Keine Conversion-Daten verfügbar.</div>';
                 }
                 break;
 
             case 'paths':
-                if (page?.conversions?.followUpPages?.length) {
-                    const idxPage = getIndexPage();
-                    Charts.sankeyChart('chart-sankey', page.conversions.followUpPages, idxPage?.label || page.path);
-                    renderPathTree('path-explorer', page.conversions.followUpPages, idxPage?.label || page.path);
+                if (page.conversions?.followUpPages?.length) {
+                    const d = addChartWrap(el, 'Nutzer-Pfade (Sankey)', 380);
+                    Charts.sankeyChart(d.querySelector('canvas').id, page.conversions.followUpPages, getPageLabel(page.path));
+                    const flowDiv = document.createElement('div');
+                    flowDiv.id = containerId + '-flow';
+                    el.appendChild(flowDiv);
+                    Tables.flowTable(flowDiv.id, page.conversions.followUpPages);
+                } else {
+                    el.innerHTML = '<div class="empty">Keine Pfad-Daten verfügbar.</div>';
                 }
+                break;
+
+            case 'topPages':
+                const allPages = INDEX.pages
+                    .sort((a, b) => b.sessions - a.sessions)
+                    .map(p => ({ ...p, category: p.category || 'Sonstige' }));
+                const barsDiv = document.createElement('div');
+                barsDiv.id = containerId + '-bars';
+                el.appendChild(barsDiv);
+                Charts.trafficBars(barsDiv.id, allPages, INDEX.categories, (path) => {
+                    // When clicking a page bar, add a KPI report for that page
+                    const clickedPage = DATA.pages.find(p => p.path === path);
+                    if (clickedPage) {
+                        addReport({
+                            type: 'kpis',
+                            pageFilter: 'path:' + path,
+                            title: getPageLabel(path),
+                            subtitle: 'Detailanalyse'
+                        });
+                    }
+                });
+                break;
+
+            case 'comparison':
+                renderKPIs(el, agg, days);
+                if (daily.length > 0) {
+                    const td = addChartWrap(el, 'Verlauf', 280);
+                    Charts.trendLine(td.querySelector('canvas').id, daily);
+                }
+                break;
+
+            default:
+                renderKPIs(el, agg, days);
                 break;
         }
     }
 
-    function setText(id, text) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = text;
+    // ── Render Helpers ──
+
+    function renderKPIs(container, agg, days) {
+        const grid = document.createElement('div');
+        grid.className = 'kpi-grid';
+        grid.innerHTML = `
+            <div class="kpi"><div class="kpi-label">Seitenaufrufe</div><div class="kpi-val">${fmtNum(agg.pv)}</div><div class="kpi-sub">Ø ${Math.round(agg.pv/days)}/Tag</div></div>
+            <div class="kpi"><div class="kpi-label">Sessions</div><div class="kpi-val">${fmtNum(agg.sessions)}</div><div class="kpi-sub">Ø ${Math.round(agg.sessions/days)}/Tag</div></div>
+            <div class="kpi"><div class="kpi-label">Nutzer</div><div class="kpi-val">${fmtNum(agg.users)}</div><div class="kpi-sub">${Math.round(agg.newUsers/Math.max(agg.users,1)*100)}% neu</div></div>
+            <div class="kpi accent"><div class="kpi-label">Engagement</div><div class="kpi-val">${(agg.engRate*100).toFixed(1).replace('.',',')}%</div><div class="kpi-sub">Rate</div></div>
+            <div class="kpi accent"><div class="kpi-label">Bounce</div><div class="kpi-val">${(agg.bounceRate*100).toFixed(1).replace('.',',')}%</div><div class="kpi-sub">Rate</div></div>
+            <div class="kpi"><div class="kpi-label">Ø Dauer</div><div class="kpi-val">${Math.round(agg.avgDuration)}s</div><div class="kpi-sub">Sitzung</div></div>
+            <div class="kpi"><div class="kpi-label">Seiten/Sitzung</div><div class="kpi-val">${agg.sessions > 0 ? (agg.pv/agg.sessions).toFixed(1).replace('.',',') : '–'}</div><div class="kpi-sub">Navigation</div></div>
+            <div class="kpi ${agg.conversions > 0 ? 'accent' : 'danger'}"><div class="kpi-label">Conversions</div><div class="kpi-val">${fmtNum(agg.conversions)}</div><div class="kpi-sub">${agg.sessions > 0 ? (agg.conversions/agg.sessions*100).toFixed(1).replace('.',',') + '%' : '–'}</div></div>
+        `;
+        container.appendChild(grid);
     }
 
-    function fmtNum(n) {
-        return n.toLocaleString('de-DE');
+    function renderKPIsMini(container, agg) {
+        const grid = document.createElement('div');
+        grid.className = 'kpi-grid';
+        grid.innerHTML = `
+            <div class="kpi"><div class="kpi-label">Sessions</div><div class="kpi-val">${fmtNum(agg.sessions)}</div></div>
+            <div class="kpi"><div class="kpi-label">Nutzer</div><div class="kpi-val">${fmtNum(agg.users)}</div></div>
+            <div class="kpi accent"><div class="kpi-label">Engagement</div><div class="kpi-val">${(agg.engRate*100).toFixed(1).replace('.',',')}%</div></div>
+            <div class="kpi ${agg.conversions > 0 ? 'accent' : ''}"><div class="kpi-label">Conversions</div><div class="kpi-val">${fmtNum(agg.conversions)}</div></div>
+        `;
+        container.appendChild(grid);
+    }
+
+    function addChartWrap(container, title, height) {
+        const wrap = document.createElement('div');
+        wrap.className = 'chart-wrap';
+        const canvasId = 'chart-' + (++reportCounter) + '-' + Math.random().toString(36).substr(2, 5);
+        wrap.innerHTML = '<h3>' + esc(title) + '</h3>' +
+            (height ? '<div style="height:' + height + 'px">' : '<div>') +
+            '<canvas id="' + canvasId + '"></canvas></div>';
+        container.appendChild(wrap);
+        return wrap;
+    }
+
+    function esc(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     return { init };

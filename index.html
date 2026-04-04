@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FOM Webseite Analyse</title>
+    <title>FOM · Build Your Analytics</title>
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0.12.1/dist/chartjs-chart-sankey.min.js"></script>
@@ -15,8 +15,8 @@
 <div id="login-screen">
     <div class="login-box">
         <div class="login-logo">FOM</div>
-        <h1>Webseite Analyse</h1>
-        <p>Zugang zum Analytics-Dashboard</p>
+        <h1>Build Your Analytics</h1>
+        <p>Zugang zum interaktiven Report-Builder</p>
         <input type="password" id="password-input" placeholder="Passwort eingeben" autofocus>
         <button id="login-btn">Anmelden</button>
         <div class="login-error" id="login-error">Falsches Passwort.</div>
@@ -25,272 +25,93 @@
 
 <!-- Dashboard -->
 <div id="dashboard">
-
-    <!-- ── Sticky Top Bar ── -->
-    <div class="top-bar">
-
-        <!-- Header -->
-        <div class="header">
-            <span class="header-logo">FOM</span>
-            <h1>Webseite Analyse</h1>
-            <span class="meta">GA4 | 01.04.2026</span>
-            <button class="filter-toggle" id="filter-toggle">Filter ▾</button>
-        </div>
-
-        <!-- Filter Bar (single row) -->
-        <div class="filter-bar" id="filter-bar">
-            <div class="filter-item">
-                <label>Domain</label>
-                <select id="domain-select">
-                    <option value="all">Alle</option>
-                    <option value="fom" selected>fom.de</option>
-                    <option value="international">fom-international</option>
-                </select>
-            </div>
-            <div class="filter-item filter-item-grow">
-                <label>Seite</label>
-                <select id="page-select"></select>
-            </div>
-            <div class="filter-item" id="sub-select-group" style="display:none">
-                <label id="sub-select-label">Detailseite</label>
-                <select id="sub-select"></select>
-            </div>
-            <div class="filter-dates" id="filter-dates">
-                <div class="filter-item">
-                    <label>Von</label>
-                    <input type="date" id="date-start">
-                </div>
-                <span class="date-sep">–</span>
-                <div class="filter-item">
-                    <label>Bis</label>
-                    <input type="date" id="date-end">
-                </div>
-                <button class="btn btn-apply" id="date-apply">Filtern</button>
-            </div>
-            <div class="presets">
-                <button class="btn btn-preset" data-days="7">7T</button>
-                <button class="btn btn-preset" data-days="30">30T</button>
-                <button class="btn btn-preset active" data-days="0">Gesamt</button>
-            </div>
-        </div>
-
-        <!-- Tab Bar -->
-        <nav class="tab-bar">
-            <button class="tab-btn active" data-tab="overview">Übersicht</button>
-            <button class="tab-btn" data-tab="traffic">Traffic</button>
-            <button class="tab-btn" data-tab="sources">Quellen</button>
-            <button class="tab-btn" data-tab="devices">Geräte & Geo</button>
-            <button class="tab-btn" data-tab="conversions">Conversions</button>
-            <button class="tab-btn" data-tab="paths">Pfade</button>
-        </nav>
+    <div class="header">
+        <span class="header-logo">FOM</span>
+        <h1>Build Your Analytics</h1>
+        <span class="meta">GA4 | Jan–Apr 2026</span>
     </div>
 
-    <!-- ── Main Content ── -->
-    <main class="main">
+    <!-- Ask Section -->
+    <div class="ask-section">
+        <div class="ask-title">Was willst du wissen?</div>
+        <div class="ask-subtitle">Stelle eine Frage oder wähle einen Analyse-Baustein</div>
 
-        <!-- No-data banner -->
-        <div id="no-data-banner" class="banner" style="display:none">
-            <strong><span class="page-name"></span></strong> – <span class="page-sessions"></span> Sessions.
-            Detailanalyse nur für Top-15-Seiten verfügbar.
+        <div class="ask-input-wrap">
+            <input type="text" class="ask-input" id="ask-input"
+                   placeholder="z.B. Wie performen die Bachelor-Seiten im März?">
+            <button class="ask-btn" id="ask-btn">Fragen</button>
         </div>
 
-        <!-- ════ Tab: Übersicht ════ -->
-        <div class="tab-panel active" id="tab-overview">
-            <div class="kpi-row kpi-row--8">
-                <div class="kpi"><div class="kpi-label">Seitenaufrufe</div><div class="kpi-val" id="kpi-ov-pv">–</div><div class="kpi-sub" id="kpi-ov-pv-sub"></div></div>
-                <div class="kpi"><div class="kpi-label">Sessions</div><div class="kpi-val" id="kpi-ov-sessions">–</div><div class="kpi-sub" id="kpi-ov-sessions-sub"></div></div>
-                <div class="kpi"><div class="kpi-label">Nutzer</div><div class="kpi-val" id="kpi-ov-users">–</div><div class="kpi-sub" id="kpi-ov-users-sub"></div></div>
-                <div class="kpi accent"><div class="kpi-label">Engagement</div><div class="kpi-val" id="kpi-ov-engagement">–</div><div class="kpi-sub">Interaktionsrate</div></div>
-                <div class="kpi accent"><div class="kpi-label">Bounce Rate</div><div class="kpi-val" id="kpi-ov-bounce">–</div><div class="kpi-sub">Absprungrate</div></div>
-                <div class="kpi"><div class="kpi-label">Ø Dauer</div><div class="kpi-val" id="kpi-ov-duration">–</div><div class="kpi-sub">Sekunden</div></div>
-                <div class="kpi"><div class="kpi-label">Seiten/Sitzung</div><div class="kpi-val" id="kpi-ov-pages">–</div><div class="kpi-sub">Navigation</div></div>
-                <div class="kpi" id="kpi-ov-conv-card"><div class="kpi-label">Conversions</div><div class="kpi-val" id="kpi-ov-conversions">–</div><div class="kpi-sub" id="kpi-ov-conversions-sub"></div></div>
-            </div>
-
-            <div class="section">
-                <h2 class="section-title">Täglicher Verlauf</h2>
-                <div class="card" style="height:300px">
-                    <canvas id="chart-trend"></canvas>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2 class="section-title">Alle Seiten nach Sessions</h2>
-                <div class="card">
-                    <div id="traffic-bars"></div>
-                </div>
-            </div>
+        <div id="key-setup" class="key-setup" style="display:none">
+            <input type="password" class="key-input" id="key-input" placeholder="OpenAI API Key (sk-...)">
+            <button class="key-save" id="key-save">Speichern</button>
         </div>
 
-        <!-- ════ Tab: Traffic ════ -->
-        <div class="tab-panel" id="tab-traffic">
-            <div class="kpi-row">
-                <div class="kpi"><div class="kpi-label">Seitenaufrufe</div><div class="kpi-val" id="kpi-tr-pv">–</div><div class="kpi-sub" id="kpi-tr-pv-sub"></div></div>
-                <div class="kpi"><div class="kpi-label">Sessions</div><div class="kpi-val" id="kpi-tr-sessions">–</div><div class="kpi-sub" id="kpi-tr-sessions-sub"></div></div>
-                <div class="kpi"><div class="kpi-label">Nutzer</div><div class="kpi-val" id="kpi-tr-users">–</div><div class="kpi-sub" id="kpi-tr-users-sub"></div></div>
-                <div class="kpi" id="kpi-tr-conv-card"><div class="kpi-label">Conversions</div><div class="kpi-val" id="kpi-tr-conversions">–</div><div class="kpi-sub" id="kpi-tr-conversions-sub"></div></div>
-            </div>
-
-            <div class="section">
-                <h2 class="section-title">Traffic im Detail</h2>
-                <div class="card">
-                    <div class="toggle-row">
-                        <button class="toggle-btn active" data-metric="pv-sessions">Aufrufe & Sessions</button>
-                        <button class="toggle-btn" data-metric="bounce-engagement">Bounce & Engagement</button>
-                        <button class="toggle-btn" data-metric="users">Nutzer</button>
-                    </div>
-                    <div style="height:320px">
-                        <canvas id="chart-traffic-trend"></canvas>
-                    </div>
-                </div>
-            </div>
+        <div class="ask-loading" id="ask-loading">
+            <div class="spinner-sm"></div>
+            <span>KI analysiert deine Frage...</span>
         </div>
 
-        <!-- ════ Tab: Quellen ════ -->
-        <div class="tab-panel" id="tab-sources">
-            <div class="data-note" id="note-sources">
-                <span class="data-note-icon">i</span>
-                <span>Quellen-Daten beziehen sich auf den Gesamtzeitraum und werden nicht durch den Datumsfilter beeinflusst.</span>
+        <div class="blocks-label">Oder wähle einen Baustein</div>
+        <div class="blocks-grid">
+            <div class="block-card" data-block="kpis">
+                <div class="block-icon">📊</div>
+                <div class="block-name">Traffic-Überblick</div>
+                <div class="block-desc">KPIs & Trend</div>
             </div>
-
-            <div class="section">
-                <h2 class="section-title">Traffic-Quellen</h2>
-                <div class="grid">
-                    <div class="card">
-                        <h3>Nach Kanal</h3>
-                        <canvas id="chart-sources-donut"></canvas>
-                    </div>
-                    <div class="card">
-                        <h3>Paid vs. Organic vs. Sonstige</h3>
-                        <canvas id="chart-paid-organic"></canvas>
-                    </div>
-                </div>
+            <div class="block-card" data-block="trend">
+                <div class="block-icon">📈</div>
+                <div class="block-name">Trend-Analyse</div>
+                <div class="block-desc">Zeitlicher Verlauf</div>
             </div>
-
-            <div class="section">
-                <h2 class="section-title">Quellen-Details</h2>
-                <div class="card" id="table-sources">
-                    <div class="empty">Keine Quellen-Daten verfügbar</div>
-                </div>
+            <div class="block-card" data-block="funnel">
+                <div class="block-icon">🎯</div>
+                <div class="block-name">Conversions</div>
+                <div class="block-desc">Funnel & Events</div>
             </div>
-        </div>
-
-        <!-- ════ Tab: Geräte & Geo ════ -->
-        <div class="tab-panel" id="tab-devices">
-            <div class="data-note" id="note-devices">
-                <span class="data-note-icon">i</span>
-                <span>Geräte-, Geo- und Event-Daten beziehen sich auf den Gesamtzeitraum.</span>
+            <div class="block-card" data-block="sources">
+                <div class="block-icon">📋</div>
+                <div class="block-name">Quellen</div>
+                <div class="block-desc">Kanäle & Traffic</div>
             </div>
-
-            <div class="section">
-                <h2 class="section-title">Geräte</h2>
-                <div class="grid">
-                    <div class="card">
-                        <h3>Geräteverteilung</h3>
-                        <canvas id="chart-device-donut"></canvas>
-                    </div>
-                    <div class="card">
-                        <h3>Ø Sitzungsdauer nach Gerät</h3>
-                        <canvas id="chart-device-duration"></canvas>
-                    </div>
-                </div>
+            <div class="block-card" data-block="devices">
+                <div class="block-icon">📱</div>
+                <div class="block-name">Geräte-Split</div>
+                <div class="block-desc">Mobile / Desktop</div>
             </div>
-
-            <div class="section">
-                <h2 class="section-title">Geografie & Events</h2>
-                <div class="grid">
-                    <div class="card">
-                        <h3>Top-Städte</h3>
-                        <canvas id="chart-cities"></canvas>
-                    </div>
-                    <div class="card">
-                        <h3>Events</h3>
-                        <canvas id="chart-events"></canvas>
-                    </div>
-                </div>
+            <div class="block-card" data-block="geo">
+                <div class="block-icon">🌍</div>
+                <div class="block-name">Geo-Analyse</div>
+                <div class="block-desc">Top-Städte</div>
+            </div>
+            <div class="block-card" data-block="events">
+                <div class="block-icon">⚡</div>
+                <div class="block-name">Events</div>
+                <div class="block-desc">Alle Interaktionen</div>
+            </div>
+            <div class="block-card" data-block="topPages">
+                <div class="block-icon">⭐</div>
+                <div class="block-name">Top-Seiten</div>
+                <div class="block-desc">Seiten-Vergleich</div>
             </div>
         </div>
+    </div>
 
-        <!-- ════ Tab: Conversions ════ -->
-        <div class="tab-panel" id="tab-conversions">
-            <div class="conv-bar">
-                <span class="conv-bar-label">Filter:</span>
-                <div class="conv-group">
-                    <span class="conv-group-title">Key Events</span>
-                    <div class="chips" id="conv-chips-key"></div>
-                </div>
-                <div class="conv-sep"></div>
-                <div class="conv-group">
-                    <span class="conv-group-title">Allgemein</span>
-                    <div class="chips" id="conv-chips-general"></div>
-                </div>
-            </div>
-
-            <div class="data-note" id="note-conversions">
-                <span class="data-note-icon">i</span>
-                <span>Funnel- und Folgeseitendaten beziehen sich auf den Gesamtzeitraum.</span>
-            </div>
-
-            <div class="section">
-                <h2 class="section-title">Conversion-Analyse</h2>
-                <div class="grid">
-                    <div class="card">
-                        <h3>Conversion-Funnel</h3>
-                        <canvas id="chart-funnel"></canvas>
-                    </div>
-                    <div class="card">
-                        <h3>Seiten mit Conversions</h3>
-                        <canvas id="chart-conv-pages"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2 class="section-title">Conversion-Rate nach Quelle</h2>
-                <div class="card" style="height:280px">
-                    <canvas id="chart-conv-by-source"></canvas>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2 class="section-title">Folgeseiten</h2>
-                <div class="card" id="table-followup">
-                    <div class="empty">Keine Conversion-Daten verfügbar</div>
-                </div>
-            </div>
+    <!-- Report Area -->
+    <div class="report-area" id="report-area">
+        <div class="report-empty" id="report-empty">
+            Stelle eine Frage oder klicke auf einen Baustein, um deinen Bericht zu starten.
         </div>
-
-        <!-- ════ Tab: Pfade ════ -->
-        <div class="tab-panel" id="tab-paths">
-            <div class="data-note" id="note-paths">
-                <span class="data-note-icon">i</span>
-                <span>Pfad-Daten beziehen sich auf den Gesamtzeitraum.</span>
-            </div>
-
-            <div class="section">
-                <h2 class="section-title">Nutzer-Pfade</h2>
-                <div class="card" style="height:400px">
-                    <canvas id="chart-sankey"></canvas>
-                </div>
-            </div>
-
-            <div class="section">
-                <h2 class="section-title">Pfade erkunden (aufklappbar)</h2>
-                <div class="card" id="path-explorer">
-                    <div class="empty">Keine Pfad-Daten verfügbar</div>
-                </div>
-            </div>
-        </div>
-
-    </main>
+    </div>
 
     <footer class="footer">
-        FOM Webseite Analyse | Google Analytics 4 | 01.04.2026
+        FOM · Build Your Analytics | Google Analytics 4 | 2026
     </footer>
 </div>
 
 <script src="js/charts.js"></script>
 <script src="js/tables.js"></script>
+<script src="js/ai.js"></script>
 <script src="js/app.js"></script>
 <script>
     Promise.all([
