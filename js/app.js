@@ -1,4 +1,4 @@
-// ── FOM Web-Analyse App ──
+// ── FOM Webseite Analyse App ──
 const App = (() => {
     let DATA = null;
     let INDEX = null;
@@ -10,6 +10,9 @@ const App = (() => {
         selectedConversions: new Set(),
         trafficMetric: 'pv-sessions'
     };
+
+    // Tabs where date filter has no effect
+    const NON_DATE_TABS = ['sources', 'devices', 'conversions', 'paths'];
 
     // ── Conversion definitions ──
     const KEY_CONVERSIONS = {
@@ -51,16 +54,17 @@ const App = (() => {
         state.dateStart = DATA.dateRange.start;
         state.dateEnd = DATA.dateRange.end;
 
-        // Default: all key conversions selected
         Object.keys(KEY_CONVERSIONS).forEach(k => state.selectedConversions.add(k));
 
         setupLogin();
+        setupFilterToggle();
         populateDropdown();
         setupDatepicker();
         setupTabs();
         setupPresets();
         setupConversionFilter();
         setupMetricToggle();
+        updateDateDimming();
     }
 
     // ── Login ──
@@ -84,7 +88,27 @@ const App = (() => {
         input.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
     }
 
-    // ── Categories that have sub-dropdowns ──
+    // ── Mobile Filter Toggle ──
+    function setupFilterToggle() {
+        const toggle = document.getElementById('filter-toggle');
+        const bar = document.getElementById('filter-bar');
+        if (toggle && bar) {
+            toggle.addEventListener('click', () => {
+                bar.classList.toggle('open');
+                toggle.textContent = bar.classList.contains('open') ? 'Filter ▴' : 'Filter ▾';
+            });
+        }
+    }
+
+    // ── Date Filter Dimming ──
+    function updateDateDimming() {
+        const dates = document.getElementById('filter-dates');
+        if (dates) {
+            dates.classList.toggle('dimmed', NON_DATE_TABS.includes(state.activeTab));
+        }
+    }
+
+    // ── Page Dropdowns ──
     const SUB_CATEGORIES = ['Bachelor', 'Master'];
 
     function getMainPages() {
@@ -203,17 +227,14 @@ const App = (() => {
         const sel = document.getElementById('page-select');
         const subSel = document.getElementById('sub-select');
 
-        // Check if path is in main dropdown
         const mainOpt = Array.from(sel.options).find(o => o.value === path);
         if (mainOpt) {
             state.pagePath = path;
             sel.value = path;
             updateSubDropdown(mainOpt.dataset?.category);
         } else {
-            // Try sub-dropdown: find which category this page belongs to
             const indexPage = INDEX.pages.find(p => p.path === path);
             if (indexPage && SUB_CATEGORIES.includes(indexPage.category)) {
-                // Select the overview page in main dropdown first
                 const overviewOpt = Array.from(sel.options).find(o => o.dataset?.category === indexPage.category);
                 if (overviewOpt) {
                     sel.value = overviewOpt.value;
@@ -225,7 +246,6 @@ const App = (() => {
         }
 
         renderAll();
-        document.querySelector('.kpi-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // ── Conversion Filter ──
@@ -233,7 +253,6 @@ const App = (() => {
         const keyContainer = document.getElementById('conv-chips-key');
         const generalContainer = document.getElementById('conv-chips-general');
 
-        // Get available steps from current data
         const availableSteps = new Set();
         DATA.pages.forEach(p => {
             if (p.conversions?.funnel) {
@@ -241,24 +260,20 @@ const App = (() => {
             }
         });
 
-        // Build key conversion chips
         Object.entries(KEY_CONVERSIONS).forEach(([step, label]) => {
             if (!availableSteps.has(step)) return;
-            const chip = createChip(step, label, true);
-            keyContainer.appendChild(chip);
+            keyContainer.appendChild(createChip(step, label, true));
         });
 
-        // Build general conversion chips
         Object.entries(GENERAL_CONVERSIONS).forEach(([step, label]) => {
             if (!availableSteps.has(step)) return;
-            const chip = createChip(step, label, false);
-            generalContainer.appendChild(chip);
+            generalContainer.appendChild(createChip(step, label, false));
         });
     }
 
     function createChip(step, label, isKey) {
         const chip = document.createElement('span');
-        chip.className = 'conv-chip' + (isKey ? ' key-chip' : '') + (state.selectedConversions.has(step) ? ' active' : '');
+        chip.className = 'chip' + (isKey ? ' key-chip' : '') + (state.selectedConversions.has(step) ? ' active' : '');
         chip.dataset.step = step;
         chip.textContent = label;
 
@@ -270,20 +285,17 @@ const App = (() => {
                 state.selectedConversions.add(step);
                 chip.classList.add('active');
             }
-            // Re-render conversions tab if active
-            if (state.activeTab === 'conversions') {
-                renderTab('conversions');
-            }
+            if (state.activeTab === 'conversions') renderTab('conversions');
         });
 
         return chip;
     }
 
-    // ── Metric Toggle (Traffic Tab) ──
+    // ── Metric Toggle ──
     function setupMetricToggle() {
-        document.querySelectorAll('.metric-btn').forEach(btn => {
+        document.querySelectorAll('.toggle-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 state.trafficMetric = btn.dataset.metric;
                 if (state.activeTab === 'traffic') renderTab('traffic');
@@ -351,14 +363,15 @@ const App = (() => {
                 state.activeTab = btn.dataset.tab;
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(c => c.classList.remove('active'));
                 document.getElementById('tab-' + state.activeTab).classList.add('active');
+                updateDateDimming();
                 renderTab(state.activeTab);
             });
         });
     }
 
-    // ── Get current page data ──
+    // ── Data Helpers ──
     function getDetailedPage() { return DATA.pages.find(p => p.path === state.pagePath); }
     function getIndexPage() { return INDEX.pages.find(p => p.path === state.pagePath); }
 
@@ -380,21 +393,14 @@ const App = (() => {
         };
     }
 
-    // ── Filter conversions based on selected chips ──
     function filterConversionFunnel(funnel) {
         if (!funnel) return [];
-        const selected = state.selectedConversions;
-        if (selected.size === 0) return []; // nothing selected
-
+        if (state.selectedConversions.size === 0) return [];
         return funnel
-            .filter(f => selected.has(f.step))
-            .map(f => ({
-                step: ALL_CONV_LABELS[f.step] || f.step,
-                count: f.count
-            }));
+            .filter(f => state.selectedConversions.has(f.step))
+            .map(f => ({ step: ALL_CONV_LABELS[f.step] || f.step, count: f.count }));
     }
 
-    // ── Traffic distribution with date filter ──
     function getTrafficDistPages() {
         const isFullRange = state.dateStart === DATA.dateRange.start && state.dateEnd === DATA.dateRange.end;
 
@@ -405,8 +411,7 @@ const App = (() => {
             return {
                 path: dp.path,
                 label: indexEntry?.label || dp.label || dp.path,
-                sessions: sessions,
-                category: indexEntry?.category || 'Sonstige'
+                sessions, category: indexEntry?.category || 'Sonstige'
             };
         });
 
@@ -414,12 +419,68 @@ const App = (() => {
             const detailedPaths = new Set(detailedPages.map(p => p.path));
             const otherPages = INDEX.pages.filter(p => !detailedPaths.has(p.path));
             return [...detailedPages, ...otherPages].sort((a, b) => b.sessions - a.sessions);
-        } else {
-            return detailedPages.sort((a, b) => b.sessions - a.sessions);
         }
+        return detailedPages.sort((a, b) => b.sessions - a.sessions);
+    }
+
+    // ── KPI Renderers (tab-specific) ──
+
+    function renderOverviewKPIs(agg, days) {
+        setText('kpi-ov-pv', fmtNum(agg.pv));
+        setText('kpi-ov-pv-sub', 'Ø ' + Math.round(agg.pv / days) + '/Tag');
+        setText('kpi-ov-sessions', fmtNum(agg.sessions));
+        setText('kpi-ov-sessions-sub', 'Ø ' + Math.round(agg.sessions / days) + '/Tag');
+        setText('kpi-ov-users', fmtNum(agg.users));
+        setText('kpi-ov-users-sub', Math.round(agg.newUsers / Math.max(agg.users, 1) * 100) + '% neue Nutzer');
+        setText('kpi-ov-engagement', (agg.engRate * 100).toFixed(1).replace('.', ',') + '%');
+        setText('kpi-ov-bounce', (agg.bounceRate * 100).toFixed(1).replace('.', ',') + '%');
+        setText('kpi-ov-duration', Math.round(agg.avgDuration) + 's');
+        setText('kpi-ov-pages', agg.sessions > 0 ? (agg.pv / agg.sessions).toFixed(2).replace('.', ',') : '–');
+        setText('kpi-ov-conversions', fmtNum(agg.conversions));
+        const convRate = agg.sessions > 0 ? (agg.conversions / agg.sessions * 100).toFixed(1).replace('.', ',') + '%' : '–';
+        setText('kpi-ov-conversions-sub', convRate + ' Conv. Rate');
+
+        const card = document.getElementById('kpi-ov-conv-card');
+        if (card) card.className = 'kpi ' + (agg.conversions > 0 ? 'accent' : 'danger');
+    }
+
+    function renderTrafficKPIs(agg, days) {
+        setText('kpi-tr-pv', fmtNum(agg.pv));
+        setText('kpi-tr-pv-sub', 'Ø ' + Math.round(agg.pv / days) + '/Tag');
+        setText('kpi-tr-sessions', fmtNum(agg.sessions));
+        setText('kpi-tr-sessions-sub', 'Ø ' + Math.round(agg.sessions / days) + '/Tag');
+        setText('kpi-tr-users', fmtNum(agg.users));
+        setText('kpi-tr-users-sub', Math.round(agg.newUsers / Math.max(agg.users, 1) * 100) + '% neue Nutzer');
+        setText('kpi-tr-conversions', fmtNum(agg.conversions));
+        const convRate = agg.sessions > 0 ? (agg.conversions / agg.sessions * 100).toFixed(1).replace('.', ',') + '%' : '–';
+        setText('kpi-tr-conversions-sub', convRate + ' Conv. Rate');
+
+        const card = document.getElementById('kpi-tr-conv-card');
+        if (card) card.className = 'kpi ' + (agg.conversions > 0 ? 'accent' : 'danger');
+    }
+
+    function clearOverviewKPIs() {
+        ['pv', 'sessions', 'users', 'engagement', 'bounce', 'duration', 'pages', 'conversions'].forEach(k => {
+            setText('kpi-ov-' + k, '–');
+        });
+        setText('kpi-ov-pv-sub', '');
+        setText('kpi-ov-sessions-sub', '');
+        setText('kpi-ov-users-sub', '');
+        setText('kpi-ov-conversions-sub', '');
+    }
+
+    function clearTrafficKPIs() {
+        ['pv', 'sessions', 'users', 'conversions'].forEach(k => {
+            setText('kpi-tr-' + k, '–');
+        });
+        setText('kpi-tr-pv-sub', '');
+        setText('kpi-tr-sessions-sub', '');
+        setText('kpi-tr-users-sub', '');
+        setText('kpi-tr-conversions-sub', '');
     }
 
     // ── Render ──
+
     function renderAll() {
         const detailed = getDetailedPage();
         const indexPage = getIndexPage();
@@ -431,74 +492,52 @@ const App = (() => {
                 noDataBanner.querySelector('.page-name').textContent = indexPage.label;
                 noDataBanner.querySelector('.page-sessions').textContent = fmtNum(indexPage.sessions);
             }
-            setText('kpi-pv', '–'); setText('kpi-pv-sub', '');
-            setText('kpi-sessions', fmtNum(indexPage.sessions)); setText('kpi-sessions-sub', 'Gesamtzeitraum');
-            setText('kpi-users', '–'); setText('kpi-users-sub', '');
-            setText('kpi-engagement', '–'); setText('kpi-bounce', '–');
-            setText('kpi-duration', '–'); setText('kpi-pages', '–');
-            setText('kpi-conversions', '–'); setText('kpi-conversions-sub', '');
+            clearOverviewKPIs();
+            clearTrafficKPIs();
+            setText('kpi-ov-sessions', fmtNum(indexPage.sessions));
+            setText('kpi-ov-sessions-sub', 'Gesamtzeitraum');
             clearCharts();
         } else {
             if (noDataBanner) noDataBanner.style.display = 'none';
-            renderKPIs();
             renderTab(state.activeTab);
         }
     }
 
     function clearCharts() {
-        ['chart-trend','chart-traffic-trend','chart-sources-donut','chart-paid-organic',
-         'chart-device-donut','chart-device-duration','chart-cities','chart-events',
-         'chart-funnel','chart-conv-pages'].forEach(id => {
+        ['chart-trend', 'chart-traffic-trend', 'chart-sources-donut', 'chart-paid-organic',
+         'chart-device-donut', 'chart-device-duration', 'chart-cities', 'chart-events',
+         'chart-funnel', 'chart-conv-pages', 'chart-conv-by-source', 'chart-sankey',
+         'chart-category-donut', 'chart-treemap'].forEach(id => {
             const el = document.getElementById(id);
             if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0, 0, el.width, el.height); }
         });
-        ['table-sources','table-followup','flow-container'].forEach(id => {
+        ['table-sources', 'table-followup', 'flow-container'].forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = '<div class="empty-state">Detaildaten nicht verfügbar.</div>';
+            if (el) el.innerHTML = '<div class="empty">Detaildaten nicht verfügbar.</div>';
         });
-    }
-
-    function renderKPIs() {
-        const daily = getFilteredDaily();
-        const agg = aggregateDaily(daily);
-        const days = daily.length || 1;
-
-        setText('kpi-pv', fmtNum(agg.pv));
-        setText('kpi-pv-sub', 'Ø ' + Math.round(agg.pv / days) + '/Tag');
-        setText('kpi-sessions', fmtNum(agg.sessions));
-        setText('kpi-sessions-sub', 'Ø ' + Math.round(agg.sessions / days) + '/Tag');
-        setText('kpi-users', fmtNum(agg.users));
-        setText('kpi-users-sub', Math.round(agg.newUsers / Math.max(agg.users, 1) * 100) + '% neue Nutzer');
-        setText('kpi-engagement', (agg.engRate * 100).toFixed(1).replace('.', ',') + '%');
-        setText('kpi-bounce', (agg.bounceRate * 100).toFixed(1).replace('.', ',') + '%');
-        setText('kpi-duration', Math.round(agg.avgDuration) + 's');
-        setText('kpi-pages', agg.sessions > 0 ? (agg.pv / agg.sessions).toFixed(2).replace('.', ',') : '–');
-        setText('kpi-conversions', fmtNum(agg.conversions));
-
-        const convRate = agg.sessions > 0 ? (agg.conversions / agg.sessions * 100).toFixed(1).replace('.', ',') + '%' : '–';
-        setText('kpi-conversions-sub', convRate + ' Conv. Rate');
-
-        const convCard = document.getElementById('kpi-conversions')?.closest('.kpi-card');
-        if (convCard) {
-            convCard.className = 'kpi-card ' + (agg.conversions > 0 ? 'highlight' : 'danger');
-        }
     }
 
     function renderTab(tab) {
         const page = getDetailedPage();
         const daily = getFilteredDaily();
+        const agg = aggregateDaily(daily);
+        const days = daily.length || 1;
 
         switch (tab) {
             case 'overview':
+                renderOverviewKPIs(agg, days);
                 const distPages = getTrafficDistPages();
                 Charts.trafficBars('traffic-bars', distPages, INDEX.categories, selectPage);
                 Charts.categoryDonut('chart-category-donut', distPages, INDEX.categories);
                 Charts.trafficTreemap('chart-treemap', distPages, INDEX.categories, selectPage);
                 if (page) Charts.trendLine('chart-trend', daily);
                 break;
+
             case 'traffic':
+                renderTrafficKPIs(agg, days);
                 if (page) Charts.trendLineMetric('chart-traffic-trend', daily, state.trafficMetric);
                 break;
+
             case 'sources':
                 if (page?.sources?.length) {
                     Charts.sourcesDoughnut('chart-sources-donut', page.sources);
@@ -506,6 +545,7 @@ const App = (() => {
                     Tables.sourcesTable('table-sources', page.sources);
                 }
                 break;
+
             case 'devices':
                 if (page?.devices?.length) {
                     Charts.deviceDoughnut('chart-device-donut', page.devices);
@@ -514,6 +554,7 @@ const App = (() => {
                 if (page?.cities?.length) Charts.citiesBar('chart-cities', page.cities);
                 if (page?.events?.length) Charts.eventsBar('chart-events', page.events);
                 break;
+
             case 'conversions':
                 if (page?.conversions?.funnel?.length) {
                     const filtered = filterConversionFunnel(page.conversions.funnel);
@@ -530,6 +571,7 @@ const App = (() => {
                     Tables.followUpTable('table-followup', page.conversions.followUpPages);
                 }
                 break;
+
             case 'paths':
                 if (page?.conversions?.followUpPages?.length) {
                     const indexPage = getIndexPage();
@@ -539,6 +581,8 @@ const App = (() => {
                 break;
         }
     }
+
+    // ── Helpers ──
 
     function setText(id, text) {
         const el = document.getElementById(id);
