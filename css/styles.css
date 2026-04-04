@@ -451,6 +451,93 @@ body {
 .export-btn:hover { border-color: var(--secondary); color: var(--secondary); }
 
 /* ══════════════════════════════════════════════
+   EXPANDABLE PATH TREE
+   ══════════════════════════════════════════════ */
+
+.path-tree { font-size: 0.78rem; }
+
+.path-source {
+    font-weight: 700; font-size: 0.85rem;
+    color: var(--primary-dark);
+    padding: var(--sp-2) 0; margin-bottom: var(--sp-2);
+    border-bottom: 2px solid var(--primary-100);
+}
+
+.path-item { border-bottom: 1px solid var(--grey-50); }
+.path-item:last-child { border-bottom: none; }
+
+.path-item-header {
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: 5px 0; cursor: default;
+}
+
+.path-item.expandable > .path-item-header { cursor: pointer; }
+.path-item.expandable > .path-item-header:hover { background: var(--primary-50); border-radius: 6px; }
+
+.path-arrow {
+    font-size: 0.55rem; color: var(--muted);
+    transition: transform 0.2s; width: 14px; text-align: center;
+    flex-shrink: 0;
+}
+
+.path-arrow.open { transform: rotate(90deg); }
+.path-arrow-spacer { width: 14px; flex-shrink: 0; }
+
+.path-item-label {
+    width: 160px; min-width: 120px; flex-shrink: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+.path-item-bar {
+    flex: 1; height: 14px; background: var(--grey-50);
+    border-radius: 7px; overflow: hidden;
+}
+
+.path-item-fill {
+    height: 100%; border-radius: 7px; min-width: 2px;
+    background: var(--primary); transition: width 0.3s;
+}
+
+.path-fill-l2 { background: var(--secondary); }
+.path-fill-l3 { background: var(--highlight); }
+
+.path-item-count {
+    width: 55px; min-width: 55px; text-align: right;
+    font-weight: 700; font-variant-numeric: tabular-nums;
+    color: var(--muted); font-size: 0.72rem;
+}
+
+.path-conv {
+    font-size: 0.62rem; font-weight: 700;
+    color: var(--success); white-space: nowrap;
+    min-width: 55px; text-align: right;
+}
+
+.path-children {
+    padding-left: 20px;
+    border-left: 2px solid var(--primary-100);
+    margin-left: 6px;
+}
+
+.path-children .path-children {
+    border-left-color: var(--secondary);
+    opacity: 0.9;
+}
+
+.path-empty {
+    padding: var(--sp-2) var(--sp-4);
+    color: var(--muted); font-size: 0.72rem; font-style: italic;
+}
+
+@media (max-width: 767px) {
+    .path-item-label { width: 90px; min-width: 90px; font-size: 0.68rem; }
+    .path-item-count { width: 42px; min-width: 42px; font-size: 0.65rem; }
+    .path-conv { min-width: 45px; font-size: 0.58rem; }
+    .path-children { padding-left: 12px; }
+}
+
+/* ══════════════════════════════════════════════
    FLOW / SANKEY
    ══════════════════════════════════════════════ */
 

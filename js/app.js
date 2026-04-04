@@ -11,10 +11,8 @@ const App = (() => {
         trafficMetric: 'pv-sessions'
     };
 
-    // Tabs where date filter has no effect
     const NON_DATE_TABS = ['sources', 'devices', 'conversions', 'paths'];
 
-    // ── Conversion definitions ──
     const KEY_CONVERSIONS = {
         'thank-you-page-anmeldung': 'Online-Anmeldung',
         'thank-you-page-infomaterial': 'Infomaterial-Bestellung',
@@ -51,6 +49,10 @@ const App = (() => {
     function init(detailedData, pageIndex) {
         DATA = detailedData;
         INDEX = pageIndex;
+
+        // Deduplicate pages-index: merge same-label entries within same category
+        deduplicateIndex();
+
         state.dateStart = DATA.dateRange.start;
         state.dateEnd = DATA.dateRange.end;
 
@@ -65,6 +67,28 @@ const App = (() => {
         setupConversionFilter();
         setupMetricToggle();
         updateDateDimming();
+    }
+
+    // ── Deduplicate Index ──
+    function deduplicateIndex() {
+        const merged = {};
+        INDEX.pages.forEach(p => {
+            const key = p.label + '||' + p.category;
+            if (!merged[key]) {
+                merged[key] = { ...p };
+            } else {
+                // Keep path with higher sessions, sum totals
+                merged[key].sessions += p.sessions;
+                if (p.sessions > merged[key]._maxSessions) {
+                    merged[key].path = p.path;
+                }
+                merged[key]._maxSessions = Math.max(merged[key]._maxSessions || 0, p.sessions);
+            }
+        });
+        INDEX.pages = Object.values(merged).map(p => {
+            delete p._maxSessions;
+            return p;
+        });
     }
 
     // ── Login ──
@@ -100,12 +124,9 @@ const App = (() => {
         }
     }
 
-    // ── Date Filter Dimming ──
     function updateDateDimming() {
         const dates = document.getElementById('filter-dates');
-        if (dates) {
-            dates.classList.toggle('dimmed', NON_DATE_TABS.includes(state.activeTab));
-        }
+        if (dates) dates.classList.toggle('dimmed', NON_DATE_TABS.includes(state.activeTab));
     }
 
     // ── Page Dropdowns ──
@@ -423,7 +444,147 @@ const App = (() => {
         return detailedPages.sort((a, b) => b.sessions - a.sessions);
     }
 
-    // ── KPI Renderers (tab-specific) ──
+    // ── Expandable Path Tree ──
+
+    function getPageLabel(path) {
+        const idx = INDEX.pages.find(p => p.path === path);
+        if (idx) return idx.label;
+        return path.replace(/^\/de\//, '/').replace(/\.html$/, '').split('/').pop() || path;
+    }
+
+    function getFollowUps(path) {
+        const page = DATA.pages.find(p => p.path === path);
+        if (page?.conversions?.followUpPages) return page.conversions.followUpPages;
+        return null;
+    }
+
+    function renderPathTree(containerId, followUpPages, sourceLabel) {
+        const el = document.getElementById(containerId);
+        if (!el) return;
+
+        const sorted = [...followUpPages]
+            .filter(p => p.users > 0)
+            .sort((a, b) => b.users - a.users);
+        const maxUsers = sorted[0]?.users || 1;
+        const top = sorted.slice(0, 20);
+
+        let html = '<div class="path-tree">';
+        html += '<div class="path-source">' + escHtml(sourceLabel) + '</div>';
+
+        top.forEach(p => {
+            const label = getPageLabel(p.page);
+            const pct = Math.max(3, (p.users / maxUsers) * 100);
+            const hasChildren = !!getFollowUps(p.page);
+            const convBadge = p.conversions > 0
+                ? '<span class="path-conv">' + p.conversions + ' Conv.</span>'
+                : '';
+
+            html += '<div class="path-item' + (hasChildren ? ' expandable' : '') + '" data-path="' + escHtml(p.page) + '">';
+            html += '<div class="path-item-header">';
+            if (hasChildren) html += '<span class="path-arrow">&#9654;</span>';
+            else html += '<span class="path-arrow-spacer"></span>';
+            html += '<span class="path-item-label" title="' + escHtml(p.page) + '">' + escHtml(label) + '</span>';
+            html += '<span class="path-item-bar"><span class="path-item-fill" style="width:' + pct + '%"></span></span>';
+            html += '<span class="path-item-count">' + fmtNum(p.users) + '</span>';
+            html += convBadge;
+            html += '</div>';
+            html += '<div class="path-children" style="display:none"></div>';
+            html += '</div>';
+        });
+
+        html += '</div>';
+        el.innerHTML = html;
+
+        // Bind click handlers for expandable items
+        el.querySelectorAll('.path-item.expandable > .path-item-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const item = header.parentElement;
+                const childrenEl = item.querySelector('.path-children');
+                const arrow = header.querySelector('.path-arrow');
+                const path = item.dataset.path;
+
+                if (childrenEl.style.display === 'none') {
+                    // Expand: load level 2
+                    childrenEl.style.display = 'block';
+                    arrow.classList.add('open');
+                    if (!childrenEl.dataset.loaded) {
+                        renderSubLevel(childrenEl, path, 2);
+                        childrenEl.dataset.loaded = 'true';
+                    }
+                } else {
+                    childrenEl.style.display = 'none';
+                    arrow.classList.remove('open');
+                }
+            });
+        });
+    }
+
+    function renderSubLevel(container, path, depth) {
+        const followUps = getFollowUps(path);
+        if (!followUps || followUps.length === 0) {
+            container.innerHTML = '<div class="path-empty">Keine Folgeseiten verfügbar</div>';
+            return;
+        }
+
+        const sorted = [...followUps]
+            .filter(p => p.users > 0 && p.page !== path)
+            .sort((a, b) => b.users - a.users);
+        const maxUsers = sorted[0]?.users || 1;
+        const top = sorted.slice(0, 12);
+
+        let html = '';
+        top.forEach(p => {
+            const label = getPageLabel(p.page);
+            const pct = Math.max(3, (p.users / maxUsers) * 100);
+            const hasChildren = depth < 3 && !!getFollowUps(p.page);
+            const convBadge = p.conversions > 0
+                ? '<span class="path-conv">' + p.conversions + ' Conv.</span>'
+                : '';
+
+            html += '<div class="path-item' + (hasChildren ? ' expandable' : '') + '" data-path="' + escHtml(p.page) + '">';
+            html += '<div class="path-item-header">';
+            if (hasChildren) html += '<span class="path-arrow">&#9654;</span>';
+            else html += '<span class="path-arrow-spacer"></span>';
+            html += '<span class="path-item-label" title="' + escHtml(p.page) + '">' + escHtml(label) + '</span>';
+            html += '<span class="path-item-bar"><span class="path-item-fill path-fill-l' + depth + '" style="width:' + pct + '%"></span></span>';
+            html += '<span class="path-item-count">' + fmtNum(p.users) + '</span>';
+            html += convBadge;
+            html += '</div>';
+            html += '<div class="path-children" style="display:none"></div>';
+            html += '</div>';
+        });
+
+        container.innerHTML = html;
+
+        // Bind click for level 3
+        if (depth < 3) {
+            container.querySelectorAll('.path-item.expandable > .path-item-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const item = header.parentElement;
+                    const childrenEl = item.querySelector('.path-children');
+                    const arrow = header.querySelector('.path-arrow');
+
+                    if (childrenEl.style.display === 'none') {
+                        childrenEl.style.display = 'block';
+                        arrow.classList.add('open');
+                        if (!childrenEl.dataset.loaded) {
+                            renderSubLevel(childrenEl, item.dataset.path, depth + 1);
+                            childrenEl.dataset.loaded = 'true';
+                        }
+                    } else {
+                        childrenEl.style.display = 'none';
+                        arrow.classList.remove('open');
+                    }
+                });
+            });
+        }
+    }
+
+    function escHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ── KPI Renderers ──
 
     function renderOverviewKPIs(agg, days) {
         setText('kpi-ov-pv', fmtNum(agg.pv));
@@ -460,23 +621,13 @@ const App = (() => {
     }
 
     function clearOverviewKPIs() {
-        ['pv', 'sessions', 'users', 'engagement', 'bounce', 'duration', 'pages', 'conversions'].forEach(k => {
-            setText('kpi-ov-' + k, '–');
-        });
-        setText('kpi-ov-pv-sub', '');
-        setText('kpi-ov-sessions-sub', '');
-        setText('kpi-ov-users-sub', '');
-        setText('kpi-ov-conversions-sub', '');
+        ['pv', 'sessions', 'users', 'engagement', 'bounce', 'duration', 'pages', 'conversions'].forEach(k => setText('kpi-ov-' + k, '–'));
+        setText('kpi-ov-pv-sub', ''); setText('kpi-ov-sessions-sub', ''); setText('kpi-ov-users-sub', ''); setText('kpi-ov-conversions-sub', '');
     }
 
     function clearTrafficKPIs() {
-        ['pv', 'sessions', 'users', 'conversions'].forEach(k => {
-            setText('kpi-tr-' + k, '–');
-        });
-        setText('kpi-tr-pv-sub', '');
-        setText('kpi-tr-sessions-sub', '');
-        setText('kpi-tr-users-sub', '');
-        setText('kpi-tr-conversions-sub', '');
+        ['pv', 'sessions', 'users', 'conversions'].forEach(k => setText('kpi-tr-' + k, '–'));
+        setText('kpi-tr-pv-sub', ''); setText('kpi-tr-sessions-sub', ''); setText('kpi-tr-users-sub', ''); setText('kpi-tr-conversions-sub', '');
     }
 
     // ── Render ──
@@ -511,7 +662,7 @@ const App = (() => {
             const el = document.getElementById(id);
             if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0, 0, el.width, el.height); }
         });
-        ['table-sources', 'table-followup', 'flow-container'].forEach(id => {
+        ['table-sources', 'table-followup', 'flow-container', 'path-explorer'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerHTML = '<div class="empty">Detaildaten nicht verfügbar.</div>';
         });
@@ -574,15 +725,13 @@ const App = (() => {
 
             case 'paths':
                 if (page?.conversions?.followUpPages?.length) {
-                    const indexPage = getIndexPage();
-                    Charts.sankeyChart('chart-sankey', page.conversions.followUpPages, indexPage?.label || page.path);
-                    Tables.flowTable('flow-container', page.conversions.followUpPages);
+                    const idxPage = getIndexPage();
+                    Charts.sankeyChart('chart-sankey', page.conversions.followUpPages, idxPage?.label || page.path);
+                    renderPathTree('path-explorer', page.conversions.followUpPages, idxPage?.label || page.path);
                 }
                 break;
         }
     }
-
-    // ── Helpers ──
 
     function setText(id, text) {
         const el = document.getElementById(id);
