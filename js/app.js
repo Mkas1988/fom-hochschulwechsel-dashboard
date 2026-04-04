@@ -8,7 +8,8 @@ const App = (() => {
         dateEnd: '',
         activeTab: 'overview',
         selectedConversions: new Set(),
-        trafficMetric: 'pv-sessions'
+        trafficMetric: 'pv-sessions',
+        domain: 'fom' // 'all', 'fom', 'international'
     };
 
     const NON_DATE_TABS = ['sources', 'devices', 'conversions', 'paths'];
@@ -60,6 +61,7 @@ const App = (() => {
 
         setupLogin();
         setupFilterToggle();
+        setupDomainFilter();
         populateDropdown();
         setupDatepicker();
         setupTabs();
@@ -127,6 +129,67 @@ const App = (() => {
     function updateDateDimming() {
         const dates = document.getElementById('filter-dates');
         if (dates) dates.classList.toggle('dimmed', NON_DATE_TABS.includes(state.activeTab));
+    }
+
+    // ── Domain Filter ──
+    // Classifies pages by domain based on path patterns
+    function isInternationalPage(path) {
+        return path.startsWith('/en/') ||
+               path.includes('/international') ||
+               path.includes('international-') ||
+               path.includes('-international');
+    }
+
+    function matchesDomainFilter(path) {
+        if (state.domain === 'all') return true;
+        const isIntl = isInternationalPage(path);
+        return state.domain === 'international' ? isIntl : !isIntl;
+    }
+
+    function setupDomainFilter() {
+        const sel = document.getElementById('domain-select');
+        if (!sel) return;
+        sel.addEventListener('change', () => {
+            state.domain = sel.value;
+            // Re-populate dropdown with filtered pages
+            repopulateDropdown();
+            renderAll();
+        });
+    }
+
+    function repopulateDropdown() {
+        const sel = document.getElementById('page-select');
+        sel.innerHTML = '';
+        const mainPages = getMainPages();
+
+        const groups = {};
+        INDEX.categories.forEach(cat => groups[cat] = []);
+        mainPages.forEach(p => { if (groups[p._cat]) groups[p._cat].push(p); });
+
+        INDEX.categories.forEach(cat => {
+            const items = (groups[cat] || []).filter(p => matchesDomainFilter(p.path));
+            if (items.length === 0) return;
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = cat;
+            items.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.path;
+                opt.dataset.category = p._cat;
+                const sessions = p.sessions >= 1000 ? Math.round(p.sessions / 1000) + 'k' : p.sessions;
+                opt.textContent = p.label + '  ·  ' + sessions + ' Sessions';
+                if (!DATA.pages.some(dp => dp.path === p.path)) opt.style.color = '#9a9a9a';
+                optgroup.appendChild(opt);
+            });
+            sel.appendChild(optgroup);
+        });
+
+        // Select first option
+        if (sel.options.length > 0) {
+            state.pagePath = sel.options[0].value;
+            sel.value = state.pagePath;
+            const opt = sel.options[sel.selectedIndex];
+            updateSubDropdown(opt?.dataset?.category);
+        }
     }
 
     // ── Page Dropdowns ──
@@ -450,9 +513,13 @@ const App = (() => {
         if (isFullRange) {
             const detailedPaths = new Set(detailedPages.map(p => p.path));
             const otherPages = INDEX.pages.filter(p => !detailedPaths.has(p.path));
-            return [...detailedPages, ...otherPages].sort((a, b) => b.sessions - a.sessions);
+            return [...detailedPages, ...otherPages]
+                .filter(p => matchesDomainFilter(p.path))
+                .sort((a, b) => b.sessions - a.sessions);
         }
-        return detailedPages.sort((a, b) => b.sessions - a.sessions);
+        return detailedPages
+            .filter(p => matchesDomainFilter(p.path))
+            .sort((a, b) => b.sessions - a.sessions);
     }
 
     // ── Expandable Path Tree ──
@@ -716,12 +783,14 @@ const App = (() => {
 
             case 'conversions':
                 if (page?.conversions?.funnel?.length) {
-                    const filtered = filterConversionFunnel(page.conversions.funnel);
-                    if (filtered.length > 0) {
-                        Charts.funnelBar('chart-funnel', filtered);
-                    } else {
-                        const el = document.getElementById('chart-funnel');
-                        if (el) { const ctx = el.getContext('2d'); ctx.clearRect(0, 0, el.width, el.height); }
+                    // Always show all key events in funnel
+                    const allKeyEvents = page.conversions.funnel
+                        .filter(f => f.step !== 'Sessions gesamt' && f.step !== 'Conversions')
+                        .map(f => ({ step: ALL_CONV_LABELS[f.step] || f.step, count: f.count }))
+                        .filter(f => f.count > 0)
+                        .sort((a, b) => b.count - a.count);
+                    if (allKeyEvents.length > 0) {
+                        Charts.funnelBar('chart-funnel', allKeyEvents);
                     }
                 }
                 if (page?.sources?.length) Charts.convBySource('chart-conv-by-source', page.sources);

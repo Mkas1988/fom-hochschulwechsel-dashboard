@@ -165,6 +165,7 @@ body {
 .filter-item input[type="date"]:focus { border-color: var(--primary); }
 
 .filter-item select { width: 100%; }
+#domain-select { width: auto; min-width: 110px; font-weight: 700; }
 
 .filter-dates {
     display: flex; align-items: center; gap: var(--sp-1);
